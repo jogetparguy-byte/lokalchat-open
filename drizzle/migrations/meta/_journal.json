@@ -1,0 +1,28 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791000278843,
+      "tag": "0000_owner_whatsapp",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791000294714,
+      "tag": "0001_internal_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791081094796,
+      "tag": "0002_unanswered_questions",
+      "breakpoints": true
+    }
+  ]
+}
+
