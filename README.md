@@ -25,6 +25,40 @@ pnpm start
 
 `pnpm start` memuatkan `.env` jika wujud. Port lalai ialah 3000; tetapkan `PORT` dan `HOST` mengikut keperluan. Output ialah server Node Nitro dalam `.output/`, bukan laman statik yang boleh diterbitkan tanpa server.
 
+## Setup environment dan Supabase
+
+`.env.example` menyenaraikan semua pemboleh ubah aplikasi dan skrip ujian dengan label **REQUIRED**, **CONDITIONAL**, **OPTIONAL** serta skop client/server/tooling. Nilai kosong bermaksud fungsi pilihan belum dikonfigurasi; semua nilai `REPLACE_ME` mesti diganti sebelum login. Template ini selamat di-commit. `.env`, `.env.local`, fail staging dan varian env lain diabaikan Git.
+
+1. Sediakan projek Supabase pembangunan/staging yang schema dan bucketnya telah disediakan daripada sejarah migration repositori. Semak sejarah sedia ada bersama pemilik projek sebelum menerapkan apa-apa migration; menyalin `.env` tidak memasang schema. Audit konfigurasi ini tidak menjalankan migration.
+2. Salin `.env.example` ke `.env`. Daripada Supabase Dashboard projek, ambil Project URL dan publishable key. Isi pasangan `VITE_SUPABASE_*` dan `SUPABASE_*` menggunakan projek yang sama. Lihat [panduan rasmi API keys](https://supabase.com/docs/guides/getting-started/api-keys).
+3. Isi `SUPABASE_SERVICE_ROLE_KEY` dengan credential backend berkeistimewaan projek. Nama ini ialah nama yang dibaca kod sekarang; jangan tukar kepada `SUPABASE_SECRET_KEY` tanpa perubahan kod. Jangan guna credential ini dalam `VITE_*`, browser atau log. Akses ini memintas RLS.
+4. Dalam Supabase Auth, tetapkan Site URL kepada origin aplikasi (lokal: `http://127.0.0.1:3000`) dan benarkan redirect `http://127.0.0.1:3000/dashboard`. Untuk deployment, gunakan origin HTTPS sendiri dan redirect `/dashboard`. Semak tetapan pengesahan emel; gunakan akaun ujian sendiri.
+5. Jalankan `pnpm dev`. Restart selepas menukar env. `VITE_*` dimuatkan ketika build; perubahan production memerlukan build semula. Server secrets perlu dibekalkan kepada proses Node ketika runtime melalui `.env` atau secret manager hosting. `pnpm start` memuatkan `.env`; `pnpm build` tidak dengan sendirinya memuatkan semua secret server ke shell.
+
+Keperluan mengikut fungsi:
+
+| Fungsi | Konfigurasi | Skop / keperluan |
+| --- | --- | --- |
+| Login dan dashboard | Dua `VITE_SUPABASE_*`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Required; hanya pasangan `VITE_*` masuk browser |
+| WhatsApp / kunci AI admin | `WHATSAPP_CRYPTO_KEY` | Server-only, conditional; jana secret rawak sendiri dan simpan dengan selamat, termasuk backup |
+| AI chat | `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL` | Server-only, conditional; ketiga-tiga perlu jika tiada kunci AI aktif yang boleh didecrypt dalam DB |
+| Provider AI admin | `GEMINI_BASE_URL`, `GEMINI_MODEL`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL` | Server-only, optional; default disenaraikan dalam template |
+| Embedding knowledge base | `OPENAI_API_KEY` | Server-only, optional; tanpa embedding, carian fallback keyword |
+| Versi WhatsApp API | `WHATSAPP_GRAPH_VERSION` | Server-only, optional; default kod `v21.0`, keserasian Meta belum diuji dalam audit ini |
+| Server dan ujian | Bahagian tooling/test dalam template | Optional; staging tests menulis data sementara, gunakan hanya projek yang dibenarkan |
+
+Dalam Settings, simpan phone number ID, access token, app secret dan verify token WhatsApp; kod membacanya daripada `whatsapp_connections`, bukan env global. Gunakan callback HTTPS `/api/public/whatsapp` untuk Meta. Kunci AI admin disimpan terenkripsi dalam `platform_api_keys`. `WHATSAPP_CRYPTO_KEY` juga melindungi kunci ini; jangan putar nilainya tanpa re-encryption data sedia ada. `GEMINI_API_KEY` dan `DEEPSEEK_API_KEY` tidak dibaca oleh aplikasi.
+
+Token scheduled hook bukan env: `weekly_report_token` berada dalam `public.internal_settings` (akses service role sahaja). Cron membaca token pada runtime dan menghantarnya sebagai `x-report-token` ke `/api/public/hooks/weekly-report`. Menyalin template tidak mengaktifkan scheduler.
+
+Untuk audit semula tanpa membaca `.env` atau menghubungi DB:
+
+```bash
+node scripts/audit-env.mjs
+```
+
+Semakan membandingkan rujukan env literal dalam kod aplikasi, skrip, ujian dan config dengan template (termasuk pilihan yang dikomen), mengesan nama hilang/tidak digunakan/duplikasi, dan mengesahkan peraturan Git ignore. Ia tidak mengesahkan credential atau sambungan provider. `SUPABASE_ANON_KEY` dan `VITE_SUPABASE_ANON_KEY` hanya alias fallback ujian RLS; login aplikasi memerlukan nama publishable key.
+
 ## Konfigurasi dan migration
 
 - `VITE_SUPABASE_URL` dan `VITE_SUPABASE_PUBLISHABLE_KEY` ialah konfigurasi awam browser. Nilainya mesti sepadan dengan projek server.
