@@ -3,6 +3,10 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 process.chdir(root);
+if (!existsSync(new URL('../node_modules/vite/bin/vite.js', import.meta.url))) {
+  console.error('Vite is not installed. Run npm install --include=dev (or pnpm install --prod=false), then run the dev command again.');
+  process.exit(1);
+}
 // Keep server secrets out of source and load the operator's private env file.
 const envFile = process.env.LOKALCHAT_ENV_FILE || '.env';
 if (existsSync(envFile)) process.loadEnvFile(envFile);

@@ -1,1 +1,11 @@
-project_id = "REPLACE_ME_SUPABASE_PROJECT_REF"
+# Local stack identifier only. Hosted projects are selected explicitly with
+# `supabase link --project-ref ...`; never store credentials in this file.
+project_id = "lokalchat-open"
+
+[auth]
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000/dashboard", "http://localhost:3000/dashboard"]
+
+[db.seed]
+# Fresh installations use migrations only; no customer data or admin account.
+enabled = false

@@ -1,4 +1,14 @@
-# LokalChat — aplikasi bersepadu
+# LokalChat Open
+
+## Install untuk developer
+
+```sh
+npx create-lokalchat@latest my-lokalchat
+cd my-lokalchat
+```
+
+CLI disediakan dalam `packages/create-lokalchat`; arahan registry `@latest` memerlukan penerbitan npm oleh maintainer terlebih dahulu. Ia belum diterbitkan oleh audit ini. Ikuti [panduan pemasangan baharu](docs/INSTALL.md) untuk Supabase lokal/hosted, semua migration, `.env`, dependencies dan pembaikan `vite: command not found`. Maintainer boleh menguji tarball sebelum publish melalui [panduan pelepasan](docs/RELEASING.md).
+
 
 Salinan kerja yang menyatukan UI React daripada `lokalchat-frontend.zip` dengan backend canonical USB. Fail USB asal tidak diubah. Semua operasi aplikasi menggunakan server functions sebenar; adapter data demo dan demo login tidak disertakan.
 
@@ -59,6 +69,8 @@ node scripts/audit-env.mjs
 
 Semakan membandingkan rujukan env literal dalam kod aplikasi, skrip, ujian dan config dengan template (termasuk pilihan yang dikomen), mengesan nama hilang/tidak digunakan/duplikasi, dan mengesahkan peraturan Git ignore. Ia tidak mengesahkan credential atau sambungan provider. `SUPABASE_ANON_KEY` dan `VITE_SUPABASE_ANON_KEY` hanya alias fallback ujian RLS; login aplikasi memerlukan nama publishable key.
 
+Jalankan `npm run setup:check` untuk membaca konfigurasi sendiri secara offline dan menolak placeholder, URL/key client-server tidak sepadan serta privileged keys dalam pemboleh ubah public. Nilai credentials tidak dicetak. Lihat [audit Supabase pemasangan baharu](docs/SUPABASE_AUDIT.md) untuk skop semakan statik dan ujian database yang masih diperlukan.
+
 ## Konfigurasi dan migration
 
 - `VITE_SUPABASE_URL` dan `VITE_SUPABASE_PUBLISHABLE_KEY` ialah konfigurasi awam browser. Nilainya mesti sepadan dengan projek server.
@@ -99,7 +111,7 @@ pnpm typecheck
 pnpm build
 ```
 
-20 ujian kod meliputi upload/cleanup, render status inbox dan handler penghantaran sebenar dengan dependencies dimock. Suite lokal memock DB/auth/provider. Verifikasi staging berasingan turut menguji PostgreSQL, RLS, Storage, authentication dan server functions sebenar; lihat laporan.
+Suite ujian kod meliputi upload/cleanup, render status inbox, handler penghantaran sebenar dengan dependencies dimock, dan keselamatan konfigurasi environment. Suite lokal memock DB/auth/provider. Verifikasi staging berasingan turut menguji PostgreSQL, RLS, Storage, authentication dan server functions sebenar; lihat laporan.
 
 Suite browser menggunakan dua server lokal. Jalankan build tanpa konfigurasi Supabase untuk senario login tanpa konfigurasi yang diuji di sini:
 

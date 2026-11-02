@@ -43,3 +43,11 @@ backup_file/
 
 # Local tools
 tools/
+
+# Generated npm release snapshot (rebuilt by create-lokalchat prepack)
+/packages/create-lokalchat/template/
+
+# Local Supabase runtime state and disposable test reports
+supabase/.temp/
+reports/DISPOSABLE_SUPABASE_*.json
+reports/PRIOR_DISPOSABLE_CLEANUP.json
