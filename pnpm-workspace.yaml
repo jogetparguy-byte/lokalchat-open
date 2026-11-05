@@ -1,2 +1,9 @@
 allowBuilds:
   esbuild: true
+
+minimumReleaseAgeExclude:
+  - minimatch@11.0.4
+
+overrides:
+  'minimatch@>=10 <11': 11.0.4
+  '@esbuild-kit/core-utils>esbuild': 0.25.12

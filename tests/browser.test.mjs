@@ -4,15 +4,16 @@ const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CH
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 try {
- await page.goto(process.env.APP_URL??'http://127.0.0.1:3000/auth');
+ const appUrl = new URL(process.env.APP_URL ?? 'http://127.0.0.1:3000/auth');
+ await page.goto(appUrl.href);
  await page.getByRole('tab',{name:'Log Masuk',exact:true}).waitFor();
  await page.getByRole('alert').filter({hasText:'Sambungan belum dikonfigurasi'}).waitFor();
  assert.equal(await page.getByRole('button',{name:'Log Masuk',exact:true}).isDisabled(),true);
  console.log('PASS production auth: missing config cannot sign in');
- await page.goto('http://127.0.0.1:3000/dashboard/inbox');
+ await page.goto(new URL('/dashboard/inbox', appUrl).href);
  await page.waitForURL('**/auth');
  console.log('PASS production protected route redirects without credentials');
- await page.goto('http://127.0.0.1:5175');
+ await page.goto(process.env.HARNESS_URL ?? 'http://127.0.0.1:5175');
  const input=page.getByRole('textbox',{name:'Balasan pelanggan'});
  await input.fill('Hello customer');
  await page.getByRole('button',{name:'Hantar',exact:true}).click();

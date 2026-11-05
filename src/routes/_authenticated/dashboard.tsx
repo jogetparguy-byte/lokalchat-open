@@ -1,3 +1,4 @@
+import { usePreferences } from "@/components/lokalchat/usePreferences";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -40,14 +41,15 @@ function formatDelta(value: number | null) {
   return { up: rounded >= 0, text: `${rounded >= 0 ? "+" : ""}${rounded}%` };
 }
 
-function formatDuration(minutes: number) {
+function formatDuration(minutes: number, english: boolean) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h <= 0) return { value: `${m}`, unit: "minit" };
-  return { value: `${h}j ${m}m`, unit: "" };
+  if (h <= 0) return { value: `${m}`, unit: english ? "min" : "minit" };
+  return { value: english ? `${h}h ${m}m` : `${h}j ${m}m`, unit: "" };
 }
 
 function Delta({ value, invert = false }: { value: number | null; invert?: boolean }) {
+  const { translate: tr, preferences } = usePreferences();
   const delta = formatDelta(value);
   if (!delta) return <span className="lc-delta">—</span>;
   const good = invert ? !delta.up : delta.up;
@@ -55,6 +57,7 @@ function Delta({ value, invert = false }: { value: number | null; invert?: boole
 }
 
 function DashboardPage() {
+  const { translate: tr, preferences } = usePreferences();
   const [range, setRange] = useState<RangeKey>("7d");
   const [openReason, setOpenReason] = useState<string | null>(null);
   const fetchMetrics = useApi(getDashboardMetrics);
@@ -65,15 +68,15 @@ function DashboardPage() {
   });
 
   const m = metricsQuery.data;
-  const saved = formatDuration(m?.savedMinutes ?? 0);
+  const saved = formatDuration(m?.savedMinutes ?? 0, preferences.language === "en");
 
   return (
     <ConsoleShell>
-      {metricsQuery.isError && <p role="alert" className="mb-4 text-sm text-destructive">Gagal memuatkan prestasi. <button type="button" onClick={() => metricsQuery.refetch()}>Cuba semula</button></p>}
+      {metricsQuery.isError && <p role="alert" className="mb-4 text-sm text-destructive">{tr("Gagal memuatkan prestasi. ")}<button type="button" onClick={() => metricsQuery.refetch()}>{tr("Cuba semula")}</button></p>}
       <div className="lc-topbar">
         <div>
-          <h1>Prestasi Ejen AI</h1>
-          <p>Ringkasan automasi WhatsApp kedai anda</p>
+          <h1>{tr("Prestasi Ejen AI")}</h1>
+          <p>{tr("Ringkasan automasi WhatsApp kedai anda")}</p>
         </div>
         <div className="lc-range">
           {RANGES.map((r) => (
@@ -83,7 +86,7 @@ function DashboardPage() {
               className={range === r.key ? "active" : ""}
               onClick={() => setRange(r.key)}
             >
-              {r.label}
+              {tr(r.label)}
             </button>
           ))}
         </div>
@@ -93,67 +96,54 @@ function DashboardPage() {
 
       <div className="lc-metrics">
         <div className="lc-card">
-          <div className="lc-card-label">
-            Mesej Auto-Dijawab
-            <Delta value={m?.autoAnsweredDelta ?? null} />
+          <div className="lc-card-label">{tr("Mesej Auto-Dijawab ")}<Delta value={m?.autoAnsweredDelta ?? null} />
           </div>
           <div className="lc-card-value">
             {metricsQuery.isPending ? "—" : (m?.autoAnswered ?? 0)}
-            <span className="lc-card-unit"> mesej</span>
+            <span className="lc-card-unit">{tr(" mesej")}</span>
           </div>
-          <div className="lc-card-sub">
-            Daripada {m?.totalMessages ?? 0} mesej keseluruhan
-          </div>
+          <div className="lc-card-sub">{tr("Daripada ")}{m?.totalMessages ?? 0}{tr(" mesej keseluruhan ")}</div>
         </div>
 
         <div className="lc-card">
-          <div className="lc-card-label">
-            Masa Dijimatkan
-            <Delta value={m?.savedDelta ?? null} />
+          <div className="lc-card-label">{tr("Masa Dijimatkan ")}<Delta value={m?.savedDelta ?? null} />
           </div>
           <div className="lc-card-value">
             {metricsQuery.isPending ? "—" : saved.value}
             {saved.unit ? <span className="lc-card-unit"> {saved.unit}</span> : null}
           </div>
-          <div className="lc-card-sub">
-            Sesi dikendalikan sepenuhnya oleh bot
-          </div>
+          <div className="lc-card-sub">{tr("Sesi dikendalikan sepenuhnya oleh bot ")}</div>
         </div>
 
         <div className="lc-card">
-          <div className="lc-card-label">
-            Kadar Handoff
-            <Delta value={m?.handoffRateDelta ?? null} invert />
+          <div className="lc-card-label">{tr("Kadar Handoff ")}<Delta value={m?.handoffRateDelta ?? null} invert />
           </div>
           <div className="lc-card-value">
             {metricsQuery.isPending ? "—" : Math.round(m?.handoffRate ?? 0)}
             <span className="lc-card-unit">%</span>
           </div>
           <div className="lc-card-sub">
-            {m?.handoffSessions ?? 0} daripada {m?.totalSessions ?? 0} sesi
-          </div>
+            {m?.handoffSessions ?? 0}{tr(" daripada ")}{m?.totalSessions ?? 0}{tr(" sesi ")}</div>
         </div>
       </div>
 
       <div className="lc-section-head">
-        <h2>Analisis Handoff</h2>
+        <h2>{tr("Analisis Handoff")}</h2>
         <span>{m?.totalHandoffs ?? 0} handoff</span>
       </div>
-      <p className="lc-section-desc">
-        Sebab utama AI menyerahkan perbualan kepada manusia. Klik untuk lihat cadangan tindakan.
-      </p>
+      <p className="lc-section-desc">{tr("Sebab utama AI menyerahkan perbualan kepada manusia. Klik untuk lihat cadangan tindakan. ")}</p>
 
       <div className="lc-insights">
         {metricsQuery.isPending ? (
           <div className="lc-insight">
             <div className="lc-insight-top">
-              <span className="lc-insight-title">Memuatkan data…</span>
+              <span className="lc-insight-title">{tr("Memuatkan data…")}</span>
             </div>
           </div>
         ) : (m?.reasons.length ?? 0) === 0 ? (
           <div className="lc-insight">
             <div className="lc-insight-top">
-              <span className="lc-insight-title">Tiada handoff dalam tempoh ini 🎉</span>
+              <span className="lc-insight-title">{tr("Tiada handoff dalam tempoh ini 🎉")}</span>
             </div>
           </div>
         ) : (
@@ -174,8 +164,8 @@ function DashboardPage() {
                 </button>
                 <div className="lc-insight-body">
                   <div className="lc-action">
-                    <b>Cadangan tindakan:</b>{" "}
-                    {r.action ?? "Tiada cadangan direkodkan untuk sebab ini."}
+                    <b>{tr("Cadangan tindakan:")}</b>{" "}
+                    {r.action ?? tr("Tiada cadangan direkodkan untuk sebab ini.")}
                   </div>
                 </div>
               </div>

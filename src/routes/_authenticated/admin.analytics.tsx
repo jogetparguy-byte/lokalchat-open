@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "@/services/api";
@@ -225,6 +225,9 @@ function PlatformApiKeySection() {
       <h2>Kunci API Platform</h2>
       <p>
         Kunci disahkan dan disimpan melalui backend. Hanya admin boleh mengubah kunci platform.
+      </p>
+      <p>
+        Pilihan provider dalam <Link to="/dashboard/settings" hash="llm">Tetapan Perniagaan</Link> digunakan terlebih dahulu jika sudah disimpan.
       </p>
 
       {keyQuery.isError && <p role="alert">Gagal membaca status kunci. <button type="button" onClick={() => keyQuery.refetch()}>Cuba semula</button></p>}

@@ -1,3 +1,4 @@
+import { usePreferences } from "@/components/lokalchat/usePreferences";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -55,6 +56,7 @@ function formatSize(bytes: number) {
 }
 
 function KnowledgeBasePage() {
+  const { translate: tr } = usePreferences();
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -86,9 +88,9 @@ function KnowledgeBasePage() {
         (old: { id: string }[] | undefined) => old?.filter((d) => d.id !== documentId) ?? [],
       );
       queryClient.invalidateQueries({ queryKey: ["kb-documents"] });
-      toast.success("Fail berjaya dipadam");
+      toast.success(tr("Fail berjaya dipadam"));
     },
-    onError: (error: Error) => toast.error(error.message || "Gagal memadam fail"),
+    onError: (error: Error) => toast.error(error.message || tr("Gagal memadam fail")),
     onSettled: () => setPendingDelete(null),
   });
 
@@ -96,7 +98,7 @@ function KnowledgeBasePage() {
     mutationFn: (systemPrompt: string) => savePrompt({ data: { systemPrompt } }),
     onSuccess: () => {
       promptDirty.current = false;
-      toast.success("System prompt berjaya disimpan");
+      toast.success(tr("System prompt berjaya disimpan"));
       queryClient.invalidateQueries({ queryKey: ["system-prompt"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -111,7 +113,7 @@ function KnowledgeBasePage() {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       const userId = userData.user?.id;
-      if (!userId) throw new Error("Sesi tamat. Sila log masuk semula.");
+      if (!userId) throw new Error(tr("Sesi tamat. Sila log masuk semula."));
 
       for (const file of list) {
         try {
@@ -125,9 +127,9 @@ function KnowledgeBasePage() {
           await queryClient.invalidateQueries({ queryKey: ["kb-documents"] });
           const result = await processDoc({ data: { id } });
           if (result.ok) toast.success(`${file.name} berjaya diproses`);
-          else toast.error(`${file.name}: ${"message" in result ? result.message : "Ralat memproses fail"}`);
+          else toast.error(`${file.name}: ${"message" in result ? result.message : tr("Ralat memproses fail")}`);
         } catch (error) {
-          toast.error(`${file.name}: ${error instanceof Error ? error.message : "Muat naik gagal"}`);
+          toast.error(`${file.name}: ${error instanceof Error ? error.message : tr("Muat naik gagal")}`);
         } finally {
           await queryClient.invalidateQueries({ queryKey: ["kb-documents"] });
           await queryClient.invalidateQueries({ queryKey: ["faqs"] });
@@ -148,7 +150,7 @@ function KnowledgeBasePage() {
       <div className="lc-topbar">
         <div>
           <h1>Knowledge Base</h1>
-          <p>Latih ejen AI dengan dokumen dan arahan kedai anda</p>
+          <p>{tr("Latih ejen AI dengan dokumen dan arahan kedai anda")}</p>
         </div>
       </div>
 
@@ -174,10 +176,10 @@ function KnowledgeBasePage() {
                 <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
               </svg>
             </div>
-            <h3>Seret &amp; lepas fail di sini</h3>
-            <p>PDF, DOCX, CSV atau TXT — maksimum 10MB setiap fail</p>
+            <h3>{tr("Seret &amp; lepas fail di sini")}</h3>
+            <p>{tr("PDF, DOCX, CSV atau TXT — maksimum 10MB setiap fail")}</p>
             <button type="button" disabled={uploading} onClick={() => inputRef.current?.click()}>
-              {uploading ? "Memuat naik…" : "Pilih Fail"}
+              {uploading ? tr("Memuat naik…") : tr("Pilih Fail")}
             </button>
             <input
               ref={inputRef}
@@ -194,11 +196,11 @@ function KnowledgeBasePage() {
               <p role="alert" className="p-3 text-sm text-destructive">{docsQuery.error.message}</p>
             ) : docsQuery.isPending ? (
               <div className="lc-kb-item">
-                <span className="lc-kb-item-name">Memuatkan…</span>
+                <span className="lc-kb-item-name">{tr("Memuatkan…")}</span>
               </div>
             ) : (docsQuery.data?.length ?? 0) === 0 ? (
               <div className="lc-kb-item">
-                <span className="lc-kb-item-name">Belum ada dokumen dimuat naik</span>
+                <span className="lc-kb-item-name">{tr("Belum ada dokumen dimuat naik")}</span>
               </div>
             ) : (
               docsQuery.data!.map((doc) => (
@@ -210,8 +212,8 @@ function KnowledgeBasePage() {
                     {doc.status === "processed"
                       ? "Diproses"
                       : doc.status === "failed"
-                        ? (doc.status_message ?? "Ralat memproses fail")
-                        : "Sedang diproses…"}
+                        ? (doc.status_message ?? tr("Ralat memproses fail"))
+                        : tr("Sedang diproses…")}
                   </span>
                   <button
                     type="button"
@@ -234,14 +236,14 @@ function KnowledgeBasePage() {
 
         <div className="lc-prompt-box">
           <h3>System Prompt</h3>
-          <p>Arahan personaliti dan peraturan untuk ejen AI anda.</p>
+          <p>{tr("Arahan personaliti dan peraturan untuk ejen AI anda.")}</p>
           {promptQuery.isError && <p role="alert" className="text-sm text-destructive">{promptQuery.error.message}</p>}
           <textarea
             maxLength={8000}
             disabled={promptQuery.isPending || promptQuery.isError || promptMutation.isPending}
             value={prompt}
             onChange={(e) => { promptDirty.current = true; setPrompt(e.target.value); }}
-            placeholder="Contoh: Anda ialah pembantu kedai yang mesra, jawab dalam Bahasa Melayu santai…"
+            placeholder={tr("Contoh: Anda ialah pembantu kedai yang mesra, jawab dalam Bahasa Melayu santai…")}
           />
           <button
             type="button"
@@ -249,7 +251,7 @@ function KnowledgeBasePage() {
             disabled={promptMutation.isPending || promptQuery.isPending || promptQuery.isError}
             onClick={() => promptMutation.mutate(prompt)}
           >
-            {promptMutation.isPending ? "Menyimpan…" : "Simpan System Prompt"}
+            {promptMutation.isPending ? tr("Menyimpan…") : tr("Simpan System Prompt")}
           </button>
         </div>
       </div>
@@ -260,14 +262,12 @@ function KnowledgeBasePage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Padam fail ini?</AlertDialogTitle>
+            <AlertDialogTitle>{tr("Padam fail ini?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingDelete?.name} dan semua kandungan yang dipelajari daripadanya akan
-              dipadam terus. Tindakan ini tidak boleh dibatalkan.
-            </AlertDialogDescription>
+              {pendingDelete?.name}{tr(" dan semua kandungan yang dipelajari daripadanya akan dipadam terus. Tindakan ini tidak boleh dibatalkan. ")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogCancel>{tr("Batal")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault();
@@ -275,7 +275,7 @@ function KnowledgeBasePage() {
               }}
               disabled={deleteMutation.isPending || uploading}
             >
-              {deleteMutation.isPending ? "Memadam…" : "Padam"}
+              {deleteMutation.isPending ? tr("Memadam…") : tr("Padam")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

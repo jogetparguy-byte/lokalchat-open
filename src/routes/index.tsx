@@ -1,116 +1,134 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { MessageCircle, Boxes, BrainCircuit, HandHelping } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowDown, ArrowUpRight } from "lucide-react";
 import { BrandLogo } from "@/components/lokalchat/BrandLogo";
+import { LandingDemo } from "@/components/lokalchat/LandingDemo";
+import { ThemeToggle } from "@/components/lokalchat/ThemeToggle";
+import "@/styles/landing.css";
+
+const DESCRIPTION = "WhatsApp support for Malaysian businesses. Answer from your own FAQs in Bahasa Melayu, English and Manglish, and take over whenever you need to.";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "LokalChat — AI WhatsApp Agent untuk PKS Malaysia" },
+      { title: "LokalChat | WhatsApp support with a local touch" },
       {
         name: "description",
         content:
-          "Sambung WhatsApp kedai anda kepada AI agent yang faham Bahasa Melayu pasar & Manglish, jawab FAQ, semak stok dan serah kepada anda bila perlu.",
+          DESCRIPTION,
       },
-      { property: "og:title", content: "LokalChat — AI WhatsApp Agent untuk PKS Malaysia" },
+      { property: "og:title", content: "LokalChat | WhatsApp support with a local touch" },
       {
         property: "og:description",
         content:
-          "AI customer service WhatsApp untuk kedai PKS Malaysia: RAG FAQ, semak stok live, dan human handoff.",
+          DESCRIPTION,
       },
+      { property: "og:locale", content: "en_MY" },
+      { property: "og:image", content: "/images/lokalchat-ribbon-hero.webp" },
+      { property: "og:image:alt", content: "Sculptural teal ribbons on a dark green background" },
     ],
-    links: [{ rel: "canonical", href: "/" }],
+    links: [
+      { rel: "canonical", href: "/" },
+      { rel: "preload", href: "/images/lokalchat-ribbon-hero.webp", as: "image", type: "image/webp" },
+    ],
   }),
   component: Landing,
 });
 
-const FEATURES = [
-  {
-    icon: BrainCircuit,
-    title: "Faham Manglish",
-    body: "\"Ada stock tak?\", \"pm harga boss\", \"bila pos?\" — semua difahami dan dijawab mesra.",
-  },
-  {
-    icon: MessageCircle,
-    title: "RAG FAQ",
-    body: "Jawapan diambil dari knowledge base kedai anda melalui carian vektor pgvector.",
-  },
-  {
-    icon: Boxes,
-    title: "Semak stok live",
-    body: "Bot panggil API inventori anda untuk beri jumlah stok terkini kepada pelanggan.",
-  },
-  {
-    icon: HandHelping,
-    title: "Human handoff",
-    body: "Bila bot tak pasti, ia matikan diri dan alert anda di dashboard serta-merta.",
-  },
-];
-
 function Landing() {
   return (
-    <main className="min-h-screen bg-background">
-      <header className="border-b border-border bg-background">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link to="/" className="inline-flex items-center">
-            <BrandLogo width={176} />
-          </Link>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/auth">Log Masuk</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link to="/dashboard">Dashboard</Link>
-            </Button>
-          </div>
+    <main className="lc-landing" lang="en" id="top">
+      <svg className="lc-logo-filter" aria-hidden="true" focusable="false" width="0" height="0">
+        <defs>
+          <filter id="lc-logo-transparent" colorInterpolationFilters="sRGB">
+            {/* Remove the artwork's white canvas before adapting its colors for dark surfaces. */}
+            <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -1 -1 -1 0 3" />
+          </filter>
+        </defs>
+      </svg>
+      <a className="lc-skip" href="#demo">Skip to the demo</a>
+      <header className="lc-header lc-container">
+        <Link to="/" aria-label="LokalChat home" className="lc-brand"><BrandLogo width={174} /></Link>
+        <nav aria-label="Main navigation" className="lc-nav">
+          <a href="#demo">The product</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#download" className="lc-download-link">Download</a>
+        </nav>
+        <div className="lc-header-actions">
+          <ThemeToggle lang="en" />
+          <Link to="/auth" className="lc-login">Log in</Link>
+          <Link to="/auth" className="lc-button lc-button-small">Create account</Link>
         </div>
       </header>
 
-      <section className="hero-gradient px-6 py-20 text-primary-foreground">
-        <div className="mx-auto max-w-4xl text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-primary-foreground/25 bg-primary-foreground/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider">
-            AI Customer Service · WhatsApp
-          </span>
-          <h1 className="mt-6 text-4xl font-bold leading-tight sm:text-6xl">
-            LokalChat
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base opacity-90 sm:text-lg">
-            Bot WhatsApp yang jawab pelanggan anda 24/7 dalam bahasa mereka — dan tahu
-            bila masanya untuk panggil boss.
+      <section className="lc-hero" aria-labelledby="hero-title">
+        <div className="lc-hero-art" aria-hidden="true">
+          <img src="/images/lokalchat-ribbon-hero.webp" alt="" width={1672} height={941} fetchPriority="high" decoding="async" />
+        </div>
+        <div className="lc-hero-copy lc-container">
+          <h1 id="hero-title">WhatsApp support.<br /><span>With a local touch.</span></h1>
+          <p>
+            AI that speaks your customers’ language, learns your business,
+            and knows when to hand it back to you.
           </p>
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" variant="secondary">
-              <Link to="/dashboard">Buka Dashboard</Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
-            >
-              <Link to="/auth">Log Masuk / Daftar</Link>
-            </Button>
+          <div className="lc-hero-actions">
+            <a href="#demo" className="lc-button">Try a conversation <ArrowDown size={17} aria-hidden="true" /></a>
+            <Link to="/dashboard" className="lc-text-link">Open dashboard</Link>
           </div>
         </div>
-      </section>
-
-      <section className="mx-auto max-w-5xl px-6 py-16">
-        <h2 className="text-center text-2xl font-bold sm:text-3xl">
-          Semua yang kedai anda perlukan
-        </h2>
-        <div className="mt-10 grid gap-5 sm:grid-cols-2">
-          {FEATURES.map((feature) => (
-            <div key={feature.title} className="surface-panel p-6">
-              <feature.icon className="size-6 text-primary" aria-hidden />
-              <h3 className="mt-4 text-lg font-semibold">{feature.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{feature.body}</p>
-            </div>
-          ))}
+        <div className="lc-hero-foot lc-container">
+          <p>Made for Malaysian businesses.</p>
+          <ul aria-label="Product capabilities">
+            <li>BM, English &amp; Manglish</li>
+            <li>Your knowledge. Your answers.</li>
+            <li>A human when it matters</li>
+          </ul>
         </div>
       </section>
 
-      <footer className="border-t border-border px-6 py-8 text-center text-sm text-muted-foreground">
-        LokalChat · Dibina untuk PKS Malaysia
+      <section id="demo" className="lc-demo-section lc-container" aria-labelledby="demo-title">
+        <div className="lc-section-heading">
+          <h2 id="demo-title">Built for local<br />conversations.</h2>
+          <p>“Bila pos, boss?” is a perfectly good question. Give it a useful answer, drawn from what your shop actually knows.</p>
+        </div>
+        <LandingDemo />
+      </section>
+
+      <section id="how-it-works" className="lc-how lc-container" aria-labelledby="how-title">
+        <div className="lc-how-heading">
+          <h2 id="how-title">Your shop.<br />Your answers.</h2>
+          <p>Set the knowledge. Connect the conversation. Stay in control.</p>
+        </div>
+        <ol className="lc-workflow">
+          <li><h3>Bring your knowledge</h3><p>Add your FAQs and documents, so answers start with your business information.</p></li>
+          <li><h3>Connect WhatsApp</h3><p>Set up WhatsApp Business and your AI provider. Connect an inventory API if you want stock checks.</p></li>
+          <li><h3>Keep the final say</h3><p>Follow the conversation in your inbox. Take over when a customer needs you.</p></li>
+        </ol>
+      </section>
+
+      <section id="download" className="lc-download lc-container" aria-labelledby="download-title">
+        <div>
+          <h2 id="download-title">Download</h2>
+          <p>Install LokalChat with npm.</p>
+        </div>
+        <div className="lc-npm-placeholder">
+          <p>npm installer</p>
+          <pre aria-label="npm installer placeholder"><code># Installer coming soon</code></pre>
+          <p>The installation command will be available here.</p>
+        </div>
+      </section>
+
+      <footer className="lc-footer">
+        <div className="lc-container lc-footer-inner">
+          <div>
+            <h2>Make room for<br />better conversations.</h2>
+            <Link to="/auth" className="lc-button">Create account <ArrowUpRight size={17} aria-hidden="true" /></Link>
+          </div>
+          <div className="lc-footer-note">
+            <a href="#top" className="lc-brand" aria-label="Back to top"><BrandLogo width={174} /></a>
+            <p>Local language. Real business.</p>
+            <p>Built for Malaysia.</p>
+          </div>
+        </div>
       </footer>
     </main>
   );

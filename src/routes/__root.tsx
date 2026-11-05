@@ -11,6 +11,8 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/lokalchat/ThemeProvider";
+import { themeBootstrapScript } from "@/lib/theme";
 import { supabase } from "@/integrations/supabase/client";
 import appCss from "@/styles.css?url";
 
@@ -127,5 +129,13 @@ function RootComponent() {
 
 
 function RootDocument({ children }: { children: ReactNode }) {
-  return <html lang="ms"><head><HeadContent /></head><body>{children}<Scripts /></body></html>;
+  return (
+    <html lang="ms" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+        <HeadContent />
+      </head>
+      <body><ThemeProvider>{children}</ThemeProvider><Scripts /></body>
+    </html>
+  );
 }

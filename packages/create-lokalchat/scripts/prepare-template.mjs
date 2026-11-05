@@ -8,7 +8,7 @@ const packageRoot = fileURLToPath(new URL('../', import.meta.url));
 const template = join(packageRoot, 'template');
 // Explicit allowlist: never package local env files, Git history, Supabase link
 // state, reports, backups, credentials, dependencies, or build artifacts.
-const allowed = ['src', 'public', 'scripts', 'tests', 'docs', 'supabase/migrations', 'supabase/config.toml', 'drizzle', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'vite.config.ts', 'tsconfig.json', '.env.example', 'README.md', 'LICENSE'];
+const allowed = ['src', 'public', 'scripts', 'tests', 'docs', 'supabase/migrations', 'supabase/config.toml', 'drizzle', 'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'vite.config.ts', 'tsconfig.json', '.env.example', 'README.md', 'LICENSE'];
 // Fail before deleting/copying the template if source trees contain any links.
 for (const item of [...allowed, '.gitignore']) await assertTemplateSafe(join(root, item));
 await rm(template, { recursive: true, force: true });
@@ -18,7 +18,7 @@ for (const item of allowed) {
     recursive: true,
     filter: source => {
       const parts = relative(root, source).split('/');
-      return !parts.some(part => ['node_modules', '.git', '.temp', '.branches', '.output', 'dist'].includes(part) || (part.startsWith('.env') && part !== '.env.example') || part.endsWith('.log'));
+      return !parts.some(part => ['node_modules', '.git', '.lokalchat', '.supabase', '.temp', '.branches', '.output', 'dist'].includes(part) || (part.startsWith('.env') && part !== '.env.example') || part.endsWith('.log'));
     },
   });
 }

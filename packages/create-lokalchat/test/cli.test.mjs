@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createProject, parseArgs } from '../bin/create-lokalchat.mjs';
+import { createProject, parseArgs, installCommand } from '../bin/create-lokalchat.mjs';
+import { completions } from '../bin/completions.mjs';
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'create-lokalchat-test-'));
@@ -55,6 +56,17 @@ test('refuses nonempty destinations without overwriting', async t => {
   assert.equal(await readFile(join(deps.cwd, 'app', 'precious'), 'utf8'), 'keep');
 });
 
+test('renames npm lockfile metadata while preserving locked dependencies', async t => {
+  const deps = await fixture(t);
+  const locked = { name: 'template', lockfileVersion: 3, packages: { '': { name: 'template' }, 'node_modules/example': { version: '1.2.3', integrity: 'keep' } } };
+  await writeFile(join(deps.template, 'package-lock.json'), JSON.stringify(locked));
+  const destination = await createProject({ directory: 'My App', packageManager: 'npm', install: false }, deps);
+  const lock = JSON.parse(await readFile(join(destination, 'package-lock.json')));
+  assert.equal(lock.name, 'my-app');
+  assert.equal(lock.packages[''].name, 'my-app');
+  assert.deepEqual(lock.packages['node_modules/example'], locked.packages['node_modules/example']);
+});
+
 test('refuses symlink destination and ancestor', async t => {
   const deps = await fixture(t);
   await mkdir(join(deps.cwd, 'real'));
@@ -85,8 +97,9 @@ for (const packageManager of ['npm', 'pnpm']) test(`${packageManager} installs b
   let invocation;
   deps.run = (...args) => { invocation = args; return { status: 0 }; };
   const destination = await createProject({ directory: 'app', packageManager, install: true }, deps);
-  assert.equal(invocation[0], packageManager);
-  assert.deepEqual(invocation[1], packageManager === 'npm' ? ['install', '--include=dev'] : ['install', '--frozen-lockfile', '--prod=false']);
+  const expected = installCommand(packageManager, packageManager === 'npm' ? ['install', '--include=dev'] : ['install', '--frozen-lockfile', '--prod=false']);
+  assert.equal(invocation[0], expected[0]);
+  assert.deepEqual(invocation[1], expected[1]);
   assert.equal(invocation[2].cwd, destination);
   assert.equal(invocation[2].shell, false);
   assert.equal(invocation[2].env.NODE_ENV, 'development');
@@ -96,5 +109,63 @@ test('failed install returns actionable error and preserves scaffold for retry',
   const deps = await fixture(t);
   deps.run = () => ({ status: 1 });
   await assert.rejects(createProject({ directory: 'app', packageManager: 'npm', install: true }, deps), /dependency installation failed.*npm install --include=dev/);
+  assert.ok((await readdir(join(deps.cwd, 'app'))).includes('package.json'));
+});
+
+
+test('Windows uses fixed cmd arguments; npm launched by npm uses its JS entrypoint', () => {
+  assert.deepEqual(installCommand('npm', ['install', '--include=dev'], { platform: 'win32', env: {} }),
+    ['cmd.exe', ['/d', '/s', '/c', 'npm.cmd install --include=dev']]);
+  assert.deepEqual(installCommand('pnpm', ['install', '--frozen-lockfile', '--prod=false'], { platform: 'win32', env: {} }),
+    ['cmd.exe', ['/d', '/s', '/c', 'pnpm.cmd install --frozen-lockfile --prod=false']]);
+  assert.deepEqual(installCommand('npm', ['install'], { env: { npm_execpath: '/npm/bin/npm-cli.js' }, execPath: '/node' }),
+    ['/node', ['/npm/bin/npm-cli.js', 'install']]);
+});
+
+test('cancelled installation keeps files and provides a resume command', async t => {
+  const deps = await fixture(t);
+  deps.run = async () => ({ status: null, interrupted: true });
+  await assert.rejects(createProject({ directory: 'app', packageManager: 'npm', install: true }, deps),
+    error => error.exitCode === 130 && /Installation cancelled.*npm install/.test(error.message));
+  assert.ok((await readdir(join(deps.cwd, 'app'))).includes('package.json'));
+});
+
+test('missing package manager preserves project and gives an actionable error', async t => {
+  const deps = await fixture(t);
+  deps.run = async () => { throw new Error('ENOENT'); };
+  await assert.rejects(createProject({ directory: 'app', packageManager: 'pnpm', install: true }, deps), /dependency installation failed.*pnpm install/);
+});
+
+test('local setup is explicit and incompatible with skipping dependencies', () => {
+  assert.equal(parseArgs(['app', '--setup-local']).setupLocal, true);
+  assert.throws(() => parseArgs(['--setup-local', '--skip-install']), /requires dependency installation/);
+});
+
+test('completion output covers supported shells without creating a project', () => {
+  for (const shell of ['bash', 'zsh', 'fish']) {
+    assert.deepEqual(parseArgs(['--completions', shell]), { completions: shell });
+    assert.match(completions(shell), /setup-local/);
+  }
+  assert.throws(() => parseArgs(['--completions']), /bash, zsh or fish/);
+});
+
+test('automatic local setup runs only after a successful dependency installation', async t => {
+  const deps = await fixture(t);
+  const calls = [];
+  deps.run = async (...args) => { calls.push(args); return { status: 0 }; };
+  const destination = await createProject({ directory: 'app', packageManager: 'npm', install: true, setupLocal: true }, deps);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1][0], process.execPath);
+  assert.deepEqual(calls[1][1], ['scripts/setup-local.mjs']);
+  assert.equal(calls[1][2].cwd, destination);
+  assert.equal(calls[1][2].shell, false);
+});
+
+test('cancelled local setup preserves project and gives its dedicated resume command', async t => {
+  const deps = await fixture(t);
+  let count = 0;
+  deps.run = async () => ++count === 1 ? { status: 0 } : { status: null, interrupted: true };
+  await assert.rejects(createProject({ directory: 'app', packageManager: 'npm', install: true, setupLocal: true }, deps),
+    error => error.exitCode === 130 && /npm run setup:local/.test(error.message));
   assert.ok((await readdir(join(deps.cwd, 'app'))).includes('package.json'));
 });

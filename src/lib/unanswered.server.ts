@@ -62,7 +62,7 @@ export async function recordUnansweredQuestion(params: {
 
   try {
     const tokens = normalizeTokens(question);
-    const embedding = await createEmbedding(question);
+    const embedding = await createEmbedding(question, businessId);
 
     const { data: candidates } = await supabaseAdmin
       .from("unanswered_questions")

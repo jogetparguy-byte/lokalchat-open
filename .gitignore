@@ -1,53 +1,100 @@
-node_modules/
-.output/
-.tanstack/
-.wrangler/
-.env
-.env.*
-!.env.example
-*.log
 
-# Environment variables & secrets
+# ==========================================
+# ENVIRONMENT VARIABLES & SECRETS
+# ==========================================
 .env
 .env.*
 **/.env
 **/.env.*
 !.env.example
 !**/.env.example
+!.env.template
+!**/.env.template
 
-# Dependencies
+# ==========================================
+# DEPENDENCIES
+# ==========================================
 node_modules/
 **/node_modules/
+.pnpm-store/
 
-# Build outputs
+# ==========================================
+# BUILD OUTPUTS & FRAMEWORK CACHE
+# ==========================================
 dist/
 build/
 .output/
 .tanstack/
 .next/
+.wrangler/
+.vercel/
 coverage/
 
-# Logs
+# ==========================================
+# LOGS
+# ==========================================
 *.log
 npm-debug.log*
 pnpm-debug.log*
+yarn-debug.log*
 
-# Local development
+# ==========================================
+# LOCAL DEVELOPMENT
+# ==========================================
 .DS_Store
+Thumbs.db
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Backups
+# ==========================================
+# BACKUPS & TEMPORARY FILES
+# ==========================================
 backup_file/
+*.bak
+*.old
+*.tmp
 *.zip
+*.tgz
 
-# Local tools
+# ==========================================
+# LOCAL TOOLS & DESIGN REFERENCES
+# ==========================================
 tools/
+.taste-skill/
+graphify-out/
 
-# Generated npm release snapshot (rebuilt by create-lokalchat prepack)
+# ==========================================
+# GENERATED INSTALLER TEMPLATE
+# ==========================================
 /packages/create-lokalchat/template/
 
-# Local Supabase runtime state and disposable test reports
+# ==========================================
+# LOCAL SUPABASE & TEST RUNTIME
+# ==========================================
+.lokalchat/
 supabase/.temp/
+playwright-report/
+test-results/
+
+# ==========================================
+# SECURITY AUDIT RAW DATA
+# ==========================================
+reports/security-2026-11-04/*.json
+# Disposable Supabase test reports
 reports/DISPOSABLE_SUPABASE_*.json
 reports/PRIOR_DISPOSABLE_CLEANUP.json
+# ==========================================
+# LOCAL DATABASES
+# ==========================================
+*.sqlite
+*.sqlite3
+*.db
+
+# ==========================================
+# LOCAL ENVIRONMENT / EDITOR STATE
+# ==========================================
+*.pid
+*.seed
+

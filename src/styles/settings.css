@@ -1,0 +1,251 @@
+/* Settings retains LokalChat's type and theme. At 1120px: 208px nav + 40px gap + 872px content. */
+.lc-settings {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 40px;
+  max-width: 1120px;
+  margin: 0 auto;
+  color: var(--foreground);
+}
+.lc-settings-nav {
+  align-self: start;
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lc-settings-nav > p {
+  margin: 0 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lc-settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 14px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.lc-settings-nav button[aria-current],
+.lc-settings-nav button:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.lc-settings-nav button[aria-current] {
+  font-weight: 600;
+}
+.lc-settings button:focus-visible,
+.lc-settings select:focus-visible,
+.lc-settings summary:focus-visible,
+.lc-settings a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.lc-settings-content {
+  min-width: 0;
+}
+.lc-settings-title {
+  margin-bottom: 28px;
+}
+.lc-settings-title h1 {
+  font: 600 24px/1.35 var(--font-sans);
+  margin: 0;
+  outline: none;
+}
+.lc-settings-title > p {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  margin: 8px 0 0;
+  line-height: 1.65;
+}
+.lc-settings-title .lc-settings-unsaved {
+  color: var(--foreground);
+  font-size: 13px;
+}
+.lc-settings-content [hidden] {
+  display: none !important;
+}
+.lc-settings-block {
+  padding: 24px 0;
+  border-top: 1px solid var(--border);
+}
+.lc-settings-block h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.lc-settings-description,
+.lc-settings-help,
+.lc-settings-note {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  line-height: 1.7;
+}
+.lc-settings-description {
+  margin-top: 6px;
+}
+.lc-settings-note {
+  padding: 16px;
+  background: var(--muted);
+  border-radius: 8px;
+  margin: 0 0 24px;
+}
+.lc-settings-fields {
+  margin-top: 20px;
+}
+.lc-settings-form {
+  display: grid;
+  gap: 14px;
+}
+.lc-settings-form fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.lc-settings-form fieldset > label:not(.lc-settings-switch) {
+  margin-top: 6px;
+}
+.lc-settings-form button[type="submit"] {
+  justify-self: start;
+  margin-top: 8px;
+}
+.lc-settings select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--input);
+  background: var(--background);
+  color: var(--foreground);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.lc-settings-preview {
+  border-radius: 8px;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.lc-settings-preview[data-preview-theme="light"] {
+  background: #fff;
+  color: #171717;
+}
+.lc-settings-preview[data-preview-theme="dark"] {
+  background: #171717;
+  color: #fafafa;
+}
+.lc-settings-preview span + span {
+  text-align: right;
+  opacity: 0.75;
+}
+.lc-settings-preview > div {
+  height: 24px;
+  background: currentColor;
+  opacity: 0.12;
+  border-radius: 4px;
+}
+.lc-settings-switch {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  min-height: 60px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.lc-settings-switch small {
+  display: block;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin-top: 5px;
+  line-height: 1.65;
+}
+.lc-settings-switch input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  accent-color: var(--foreground);
+}
+.lc-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.lc-settings details {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 12px 0;
+}
+.lc-settings summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.lc-settings details p {
+  margin: 12px 0;
+  color: var(--muted-foreground);
+}
+.lc-settings-help-link {
+  display: block;
+  width: fit-content;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.lc-settings-about > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 14px;
+  padding: 12px 0;
+}
+.lc-settings-about dt {
+  color: var(--muted-foreground);
+}
+.lc-settings-content > div > section:first-of-type {
+  margin-top: 0;
+}
+.lc-settings-mobile {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .lc-settings {
+    gap: 24px;
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .lc-settings {
+    display: block;
+  }
+  .lc-settings-nav {
+    display: none;
+  }
+  .lc-settings-mobile {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+  .lc-settings select,
+  .lc-settings input:not([type="checkbox"]),
+  .lc-settings button {
+    min-height: 44px;
+  }
+  .lc-settings-title h1 {
+    font-size: 22px;
+  }
+  .lc-settings-block {
+    padding: 20px 0;
+  }
+}

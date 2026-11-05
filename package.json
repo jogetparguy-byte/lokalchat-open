@@ -12,13 +12,25 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "start": "node --env-file-if-exists=.env .output/server/index.mjs",
-    "test": "node --import tsx tests/upload-document.test.mjs && node --import tsx tests/inbox.test.tsx && node tests/backend-delivery.test.mjs && node tests/delivery-error.test.mjs && node tests/check-env.test.mjs",
+    "test": "node --import tsx tests/upload-document.test.mjs && node --import tsx tests/inbox.test.tsx && node tests/backend-delivery.test.mjs && node tests/delivery-error.test.mjs && node tests/check-env.test.mjs && node --import tsx --test tests/public-config.test.mjs && node tests/local-setup.test.mjs && npm run test:llm-settings && npm run test:supabase-settings && npm run test:theme && npm run test:settings && npm run test:tenant-env",
+    "test:theme": "node --import tsx tests/theme.test.mjs",
+    "test:theme:ssr": "node tests/theme-ssr.mjs",
     "test:browser": "node tests/browser.test.mjs",
     "test:harness": "vite --config tests/browser-harness/vite.config.mjs",
     "test:staging:rls": "node tests/staging-rls-storage.mjs",
     "test:staging:browser": "node tests/staging-browser.mjs",
     "test:inbox-route": "node tests/inbox-route.test.mjs",
-    "setup:check": "node scripts/check-env.mjs"
+    "setup:check": "node scripts/check-env.mjs",
+    "setup:local": "node scripts/setup-local.mjs",
+    "stop:local": "node scripts/setup-local.mjs --stop",
+    "test:local-setup": "node tests/local-setup.test.mjs",
+    "test:llm-settings": "node --import tsx tests/llm-settings.test.mjs",
+    "test:llm-settings:browser": "node tests/llm-settings-browser.mjs",
+    "test:dependencies": "node tests/dependency-compat.test.mjs",
+    "test:supabase-settings": "node --import tsx tests/supabase-settings.test.mjs",
+    "test:supabase-settings:browser": "node tests/supabase-settings-browser.mjs",
+    "test:settings": "node --import tsx tests/settings.test.mjs",
+    "test:tenant-env": "node --import tsx tests/tenant-env.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -76,10 +88,10 @@
     "unpdf": "^1.8.1",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
-    "zod": "^3.24.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@eslint/js": "^9.32.0",
+    "@eslint/js": "^10.0.1",
     "@lovable.dev/vite-tanstack-config": "2.23.1",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
@@ -87,22 +99,28 @@
     "@vitejs/plugin-react": "^5.2.0",
     "drizzle-kit": "^0.31.11",
     "drizzle-orm": "^0.45.3",
-    "eslint": "^9.32.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^15.15.0",
     "nitro": "3.0.260603-beta",
     "postgres": "^3.4.9",
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.56.1",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.2.0",
     "tsx": "4.23.15",
     "playwright": "1.61.1"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": "^22.13.0 || >=24.0.0"
+  },
+  "overrides": {
+    "minimatch@>=10 <11": "11.0.4",
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    }
   }
 }

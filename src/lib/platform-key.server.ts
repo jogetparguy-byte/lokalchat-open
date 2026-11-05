@@ -1,12 +1,10 @@
 /**
- * Shared platform LLM key resolution (server-only).
+ * Per-owner LLM key resolution (server-only).
  *
- * The key is stored encrypted (AES-256-GCM, wa-crypto.server) in
- * public.platform_api_keys so the founder can rotate it without a redeploy.
- * If no active row exists we use the server AI_* environment variables.
+ * Credentials come exclusively from the verified owner's private env file.
+ * Legacy platform keys and process AI_* variables never fund tenant requests.
  */
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { decryptSecret } from "./wa-crypto.server";
+import { getSavedLlmConfig } from "./llm-env.server";
 
 export type ProviderId = "gemini" | "deepseek";
 
@@ -59,33 +57,10 @@ export async function verifyProviderKey(provider: ProviderId, apiKey: string) {
 
 export type LlmConfig = { baseUrl: string; model: string; apiKey: string };
 
-export async function getActiveLlmConfig(): Promise<LlmConfig> {
-  const { data } = await supabaseAdmin
-    .from("platform_api_keys")
-    .select("provider, api_key_encrypted")
-    .eq("is_active", true)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (data && isProviderId(data.provider)) {
-    try {
-      const meta = PROVIDERS[data.provider];
-      return {
-        baseUrl: meta.baseUrl,
-        model: meta.model,
-        apiKey: decryptSecret(data.api_key_encrypted),
-      };
-    } catch {
-      // fall through to the server environment configuration
-    }
-  }
-
-  const apiKey = process.env["AI_API_KEY"];
-  const baseUrl = process.env["AI_BASE_URL"];
-  const model = process.env["AI_MODEL"];
-  if (!apiKey || !baseUrl || !model || [apiKey, baseUrl, model].some(v => v.includes("REPLACE_ME"))) {
-    throw new Error("Configure AI_API_KEY, AI_BASE_URL and AI_MODEL on the server");
-  }
-  return { apiKey, baseUrl: baseUrl.replace(/\/+$/, ""), model };
+export async function getActiveLlmConfig(userId: string): Promise<LlmConfig> {
+  // An explicit selection in Settings takes precedence over the legacy admin DB key.
+  // Shared keys are intentionally excluded, including when this owner has no config.
+  const saved = await getSavedLlmConfig(userId);
+  if (!saved) throw new Error("Sediakan konfigurasi Provider AI untuk akaun anda dalam Tetapan");
+  return saved;
 }

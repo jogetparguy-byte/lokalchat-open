@@ -1,7 +1,7 @@
 /** Displays the supplied official artwork, framing its surrounding whitespace in CSS. */
 export function BrandLogo({ width = 176 }: { width?: number }) {
   return (
-    <span style={{ display: "block", position: "relative", overflow: "hidden", width, maxWidth: "100%", aspectRatio: "4 / 1", flexShrink: 0, mixBlendMode: "multiply" }}>
+    <span className="lc-brand-artwork" style={{ display: "block", position: "relative", overflow: "hidden", width, maxWidth: "100%", aspectRatio: "4 / 1", flexShrink: 0, mixBlendMode: "multiply" }}>
       <img
         src="/lokalchat-official.jpg"
         alt="LokalChat"

@@ -1,3 +1,4 @@
+import { usePreferences } from "@/components/lokalchat/usePreferences";
 import { createFileRoute } from "@tanstack/react-router";
 import { ConsoleShell } from "@/components/lokalchat/ConsoleShell";
 import { useEffect, useRef, useState } from "react";
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/_authenticated/dashboard_/inbox")({
 });
 
 export function DashboardPage() {
+  const { translate: tr } = usePreferences();
   const queryClient = useQueryClient();
   const { chat: initialChat } = Route.useSearch();
   const [selectedId, setSelectedId] = useState<string | null>(initialChat ?? null);
@@ -68,7 +70,7 @@ export function DashboardPage() {
   const toggleMutation = useMutation({
     mutationFn: ({ chatId, isActive }: { chatId: string; isActive: boolean }) => toggleBot({ data: { chatId, isActive } }),
     onMutate: () => setActionError(null),
-    onError: (_error, variables) => setActionError({ chatId: variables.chatId, text: "Status bot gagal dikemas kini. Cuba lagi." }),
+    onError: (_error, variables) => setActionError({ chatId: variables.chatId, text: tr("Status bot gagal dikemas kini. Cuba lagi.") }),
     onSettled: (_data, _error, variables) => refresh(variables.chatId),
     retry: false,
   });
@@ -76,16 +78,16 @@ export function DashboardPage() {
     mutationFn: ({ chatId, text, requestId }: { chatId: string; text: string; requestId: string }) => sendReply({ data: { chatId, text, requestId } }),
     onMutate: () => setActionError(null),
     onSuccess: (result, variables) => {
-      if (!result.ok) setActionError({ chatId: variables.chatId, text: "Mesej disimpan tetapi penghantaran gagal. Tekan Cuba Semula pada mesej tersebut." });
+      if (!result.ok) setActionError({ chatId: variables.chatId, text: tr("Mesej disimpan tetapi penghantaran gagal. Tekan Cuba Semula pada mesej tersebut.") });
     },
-    onError: (_error, variables) => setActionError({ chatId: variables.chatId, text: "Permintaan penghantaran gagal. Semak mesej tersimpan sebelum menghantar lagi." }),
+    onError: (_error, variables) => setActionError({ chatId: variables.chatId, text: tr("Permintaan penghantaran gagal. Semak mesej tersimpan sebelum menghantar lagi.") }),
     onSettled: (_data, _error, variables) => refresh(variables.chatId),
     retry: false,
   });
   const retryMutation = useMutation({
     mutationFn: ({ messageId }: { messageId: string; chatId: string }) => retryReply({ data: { messageId } }),
     onMutate: () => setActionError(null),
-    onError: (_error, variables) => setActionError({ chatId: variables.chatId, text: "Penghantaran semula gagal. Status terkini dimuat semula; tekan Cuba Semula jika mesej masih gagal." }),
+    onError: (_error, variables) => setActionError({ chatId: variables.chatId, text: tr("Penghantaran semula gagal. Status terkini dimuat semula; tekan Cuba Semula jika mesej masih gagal.") }),
     onSettled: async (_data, _error, variables) => { try { await refresh(variables.chatId); } finally { retryLock.current = false; } },
     retry: false,
   });
@@ -103,12 +105,12 @@ export function DashboardPage() {
       <div className="lc-topbar">
         <div>
           <h1>Live Chat</h1>
-          <p>Urus perbualan WhatsApp pelanggan anda</p>
+          <p>{tr("Urus perbualan WhatsApp pelanggan anda")}</p>
         </div>
       </div>
 
-      {chatsQuery.isPending && <p role="status" className="mb-3 text-sm">Memuatkan perbualan…</p>}
-      {chatsQuery.isError && <div role="alert" className="mb-3 text-sm text-destructive">Perbualan gagal dimuatkan. <Button variant="outline" size="sm" onClick={() => chatsQuery.refetch()}>Cuba lagi</Button></div>}
+      {chatsQuery.isPending && <p role="status" className="mb-3 text-sm">{tr("Memuatkan perbualan…")}</p>}
+      {chatsQuery.isError && <div role="alert" className="mb-3 text-sm text-destructive">{tr("Perbualan gagal dimuatkan. ")}<Button variant="outline" size="sm" onClick={() => chatsQuery.refetch()}>{tr("Cuba lagi")}</Button></div>}
       <div className="flex min-h-[32rem] flex-col md:flex-row flex-1 overflow-hidden rounded-xl border border-border">
         <aside className="max-h-64 w-full border-b border-border md:max-h-none md:max-w-xs md:border-b-0 md:border-r">
           <ChatSidebar
@@ -125,7 +127,7 @@ export function DashboardPage() {
               selectedId && toggleMutation.mutate({ chatId: selectedId, isActive })
             }
             onSend={(text, requestId) => {
-              if (!selectedId) return Promise.reject(new Error("Pilih perbualan dahulu"));
+              if (!selectedId) return Promise.reject(new Error(tr("Pilih perbualan dahulu")));
               return replyMutation.mutateAsync({ chatId: selectedId, text, requestId });
             }}
             onRetry={(messageId) => {
@@ -138,15 +140,15 @@ export function DashboardPage() {
             retryingId={retryMutation.isPending ? retryMutation.variables.messageId : null}
             toggling={toggleMutation.isPending}
             loading={messagesQuery.isPending}
-            error={messagesQuery.isError ? "Mesej gagal dimuatkan. Sistem akan cuba memuatkan semula." : actionError?.chatId === selectedId ? actionError.text : null}
+            error={messagesQuery.isError ? tr("Mesej gagal dimuatkan. Sistem akan cuba memuatkan semula.") : actionError?.chatId === selectedId ? actionError.text : null}
             sending={replyMutation.isPending}
           />
         </main>
       </div>
 
       <div className="mt-4 rounded-xl border border-border p-3">
-        <p className="mb-3 text-xs text-muted-foreground">Simulator menggunakan AI dan data kedai sebenar. Mesej direkod dalam inbox; tiada WhatsApp dihantar.</p>
-        {simulateMutation.isError && <p role="alert" className="mb-2 text-sm text-destructive">Simulasi gagal. Semak konfigurasi AI kedai.</p>}
+        <p className="mb-3 text-xs text-muted-foreground">{tr("Simulator menggunakan AI dan data kedai sebenar. Mesej direkod dalam inbox; tiada WhatsApp dihantar.")}</p>
+        {simulateMutation.isError && <p role="alert" className="mb-2 text-sm text-destructive">{tr("Simulasi gagal. Semak konfigurasi AI kedai.")}</p>}
         <SimulatorForm
           onSimulate={(phone, text) =>
             simulateMutation.mutate({ phone, text })
@@ -165,8 +167,9 @@ function SimulatorForm({
   onSimulate: (phone: string, text: string) => void;
   loading: boolean;
 }) {
+  const { translate: tr } = usePreferences();
   const [phone, setPhone] = useState("+60123456789");
-  const [text, setText] = useState("Ada stok tak?");
+  const [text, setText] = useState(tr("Ada stok tak?"));
 
   return (
     <form
@@ -177,9 +180,7 @@ function SimulatorForm({
       className="flex flex-wrap items-end gap-2"
     >
       <div className="min-w-[12rem] flex-1">
-        <Label htmlFor="sim-phone" className="text-xs">
-          Nombor telefon
-        </Label>
+        <Label htmlFor="sim-phone" className="text-xs">{tr("Nombor telefon ")}</Label>
         <Input
           id="sim-phone"
           value={phone}
@@ -187,18 +188,14 @@ function SimulatorForm({
         />
       </div>
       <div className="min-w-[16rem] flex-[2]">
-        <Label htmlFor="sim-text" className="text-xs">
-          Mesej pelanggan
-        </Label>
+        <Label htmlFor="sim-text" className="text-xs">{tr("Mesej pelanggan ")}</Label>
         <Input
           id="sim-text"
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
       </div>
-      <Button type="submit" disabled={loading || !phone.trim() || !text.trim()}>
-        Simulasi
-      </Button>
+      <Button type="submit" disabled={loading || !phone.trim() || !text.trim()}>{tr("Simulasi ")}</Button>
     </form>
   );
 }

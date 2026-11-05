@@ -1,3 +1,4 @@
+import { accountPreferences } from "@/lib/preferences";
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "crypto";
 import { summarize, type MsgRow, type HandoffRow } from "@/lib/metrics";
@@ -53,6 +54,9 @@ export const Route = createFileRoute("/api/public/hooks/weekly-report")({
         for (const p of profiles ?? []) {
           if (p.weekly_report_sent_at && p.weekly_report_sent_at > dedupe) continue;
           try {
+            const { data: owner, error: ownerError } = await supabaseAdmin.auth.admin.getUserById(p.id);
+            // Fail closed if preferences cannot be read; never send an opted-out report.
+            if (ownerError || !owner.user || !accountPreferences(owner.user.user_metadata).weeklyReport) continue;
             const [{ data: msgs }, { data: handoffs }] = await Promise.all([
               supabaseAdmin
                 .from("messages")

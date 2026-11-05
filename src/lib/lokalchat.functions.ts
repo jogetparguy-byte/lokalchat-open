@@ -298,7 +298,7 @@ export const saveFaq = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const content = `Soalan: ${data.question}\nJawapan: ${data.answer}`;
     const { createEmbedding } = await import("@/lib/embeddings.server");
-    const embedding = await createEmbedding(content);
+    const embedding = await createEmbedding(content, context.userId);
 
     const { error } = await context.supabase.from("knowledge_base").insert({
       business_id: context.userId,
@@ -336,27 +336,23 @@ export const getProfile = createServerFn({ method: "GET" })
 
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (input: { businessName: string; inventoryApiUrl: string; ownerWhatsapp?: string }) => input,
-  )
+  .inputValidator((input: import("./profile-settings").ProfilePatch) => input)
   .handler(async ({ data, context }) => {
-    const url = data.inventoryApiUrl.trim();
-    const ownerWa = (data.ownerWhatsapp ?? "").replace(/[\s+-]/g, "");
-    if (ownerWa && !/^\d{8,15}$/.test(ownerWa)) {
-      throw new Error("Nombor WhatsApp pemilik tidak sah (cth: 60123456789)");
-    }
-    if (url) {
+    const { validateProfilePatch } = await import("./profile-settings");
+    const patch = validateProfilePatch(data);
+    if (patch.inventory_api_url) {
       const { assertPublicHttpUrl } = await import("./ssrf.server");
-      await assertPublicHttpUrl(url);
+      await assertPublicHttpUrl(patch.inventory_api_url);
     }
-
-    const { error } = await context.supabase.from("profiles").upsert({
-      id: context.userId,
-      business_name: data.businessName.trim() || "Kedai Saya",
-      inventory_api_url: url || null,
-      owner_whatsapp: ownerWa || null,
-    });
+    // Only change the submitted section. Saving one panel must not overwrite another.
+    const { data: rows, error } = await context.supabase.from("profiles")
+      .update(patch).eq("id", context.userId).select("id");
     if (error) throw new Error(error.message);
+    if (!rows?.length) {
+      const { error: insertError } = await context.supabase.from("profiles")
+        .insert({ id: context.userId, business_name: "Kedai Saya", ...patch });
+      if (insertError) throw new Error(insertError.message);
+    }
     return { ok: true };
   });
 
@@ -734,7 +730,7 @@ export const processKbDocument = createServerFn({ method: "POST" })
       }[] = [];
       for (const chunk of chunks) {
         const content = `Dokumen: ${doc.file_name}\n${chunk}`;
-        const embedding = await createEmbedding(content);
+        const embedding = await createEmbedding(content, context.userId);
         rows.push({
           business_id: context.userId,
           document_id: doc.id,
@@ -1060,6 +1056,49 @@ export const getPlatformApiKey = createServerFn({ method: "GET" })
     return data;
   });
 
+/** Each authenticated owner manages only their own credentials; no admin role is required. */
+export const getLlmSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { getLlmEnvSettings } = await import("./llm-env.server");
+    return { canManage: true as const, ...await getLlmEnvSettings(context.userId) };
+  });
+
+export const saveLlmSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(async (input: unknown) => {
+    const { validateLlmSettings } = await import("./llm-settings");
+    return validateLlmSettings(input);
+  })
+  .handler(async ({ data, context }) => {
+    if (data.provider === "custom") {
+      const { assertPublicHttpUrl } = await import("./ssrf.server");
+      try { await assertPublicHttpUrl(data.baseUrl); }
+      catch { throw new Error("Base URL mesti merujuk kepada endpoint HTTPS awam yang boleh dicapai"); }
+    }
+    const { saveLlmEnvSettings } = await import("./llm-env.server");
+    return { canManage: true as const, ...await saveLlmEnvSettings(context.userId, data) };
+  });
+
+/** Supabase credentials are private to the verified account. */
+export const getSupabaseSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { getSupabaseEnvSettings } = await import("./supabase-env.server");
+    return { canManage: true as const, ...await getSupabaseEnvSettings(context.userId) };
+  });
+
+export const saveSupabaseSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(async (input: unknown) => {
+    const { validateSupabaseSettings } = await import("./supabase-settings");
+    return validateSupabaseSettings(input);
+  })
+  .handler(async ({ data, context }) => {
+    const { saveSupabaseEnvSettings } = await import("./supabase-env.server");
+    return { canManage: true as const, ...await saveSupabaseEnvSettings(context.userId, data) };
+  });
+
 export const savePlatformApiKey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { provider: string; apiKey: string }) => {
@@ -1192,7 +1231,7 @@ export const resolveUnansweredWithFaq = createServerFn({ method: "POST" })
 
     const content = `Soalan: ${data.question}\nJawapan: ${data.answer}`;
     const { createEmbedding } = await import("@/lib/embeddings.server");
-    const embedding = await createEmbedding(content);
+    const embedding = await createEmbedding(content, context.userId);
     const { data: faq, error } = await context.supabase
       .from("knowledge_base")
       .insert({

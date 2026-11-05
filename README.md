@@ -5,9 +5,16 @@
 ```sh
 npx create-lokalchat@latest my-lokalchat
 cd my-lokalchat
+npm run setup:local
 ```
 
 CLI disediakan dalam `packages/create-lokalchat`; arahan registry `@latest` memerlukan penerbitan npm oleh maintainer terlebih dahulu. Ia belum diterbitkan oleh audit ini. Ikuti [panduan pemasangan baharu](docs/INSTALL.md) untuk Supabase lokal/hosted, semua migration, `.env`, dependencies dan pembaikan `vite: command not found`. Maintainer boleh menguji tarball sebelum publish melalui [panduan pelepasan](docs/RELEASING.md).
+
+`npm run setup:local` menyediakan database pembangunan berasingan, menyemak migration/Auth/REST dan membuka app di `http://127.0.0.1:3000`. Muat turun pertama memerlukan internet dan boleh mengambil beberapa minit. Biarkan terminal terbuka; Ctrl+C menghentikan app dan database ini tanpa memadam data. Jalankan arahan sama untuk menyambung. Pilihan `--setup-local` pada installer menjalankan setup terus selepas dependencies siap.
+
+Setup menggunakan Supabase CLI 3.0.0 yang dipinkan dan disahkan checksum serta **stack eksperimen**. Docker/Podman digunakan jika tersedia; native tersedia pada Linux glibc 2.35+ x64/arm64 atau macOS 14+ Apple silicon. Windows/Intel Mac memerlukan Docker/Podman yang berjalan. Native sesuai untuk satu projek berjalan bagi setiap environment. Gunakan `npm run setup:local -- --runtime native` untuk memilih native secara jelas. Setup ini untuk pembangunan sahaja; pengesahan emel dimatikan dalam konfigurasi lokal berasingan.
+
+Fail `.env` dan konfigurasi Supabase asal dikekalkan. Konfigurasi peribadi dan data lokal berada dalam `.lokalchat/`, yang diabaikan Git. Jangan kongsi fail atau log di situ. Setup automatik memerlukan folder baharu tanpa `.env` tersuai. WhatsApp/AI masih memerlukan tetapan berasingan. Semak tanpa membuka app dengan `npm run setup:local -- --check`; hentikan database selepas launcher terhenti dengan `npm run stop:local`.
 
 
 Salinan kerja yang menyatukan UI React daripada `lokalchat-frontend.zip` dengan backend canonical USB. Fail USB asal tidak diubah. Semua operasi aplikasi menggunakan server functions sebenar; adapter data demo dan demo login tidak disertakan.
@@ -51,13 +58,21 @@ Keperluan mengikut fungsi:
 | --- | --- | --- |
 | Login dan dashboard | Dua `VITE_SUPABASE_*`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Required; hanya pasangan `VITE_*` masuk browser |
 | WhatsApp / kunci AI admin | `WHATSAPP_CRYPTO_KEY` | Server-only, conditional; jana secret rawak sendiri dan simpan dengan selamat, termasuk backup |
-| AI chat | `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL` | Server-only, conditional; ketiga-tiga perlu jika tiada kunci AI aktif yang boleh didecrypt dalam DB |
+| AI chat | **Settings → Provider AI**, setiap akaun | Server-only; kunci daripada env pemasangan atau `platform_api_keys` tidak digunakan untuk permintaan pengguna |
 | Provider AI admin | `GEMINI_BASE_URL`, `GEMINI_MODEL`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL` | Server-only, optional; default disenaraikan dalam template |
-| Embedding knowledge base | `OPENAI_API_KEY` | Server-only, optional; tanpa embedding, carian fallback keyword |
+| Embedding knowledge base | API key OpenAI milik akaun dalam **Provider AI** | Optional; provider lain atau embedding gagal menggunakan carian keyword |
 | Versi WhatsApp API | `WHATSAPP_GRAPH_VERSION` | Server-only, optional; default kod `v21.0`, keserasian Meta belum diuji dalam audit ini |
 | Server dan ujian | Bahagian tooling/test dalam template | Optional; staging tests menulis data sementara, gunakan hanya projek yang dibenarkan |
 
 Dalam Settings, simpan phone number ID, access token, app secret dan verify token WhatsApp; kod membacanya daripada `whatsapp_connections`, bukan env global. Gunakan callback HTTPS `/api/public/whatsapp` untuk Meta. Kunci AI admin disimpan terenkripsi dalam `platform_api_keys`. `WHATSAPP_CRYPTO_KEY` juga melindungi kunci ini; jangan putar nilainya tanpa re-encryption data sedia ada. `GEMINI_API_KEY` dan `DEEPSEEK_API_KEY` tidak dibaca oleh aplikasi.
+
+Setiap pengguna yang sudah login mengisi **Settings → Provider AI** sendiri, tanpa role admin. Konfigurasi disimpan ke `.lokalchat/users/<hash-projek-auth>/<user-id>/.env`, dengan direktori `0700` dan fail `0600` pada POSIX. `LOKALCHAT_USER_ENV_DIR` boleh memilih direktori persisten lain; fail `.env` pemasangan dan `LOKALCHAT_ENV_FILE` tidak ditulis oleh borang. Hash projek Auth memastikan UUID yang sama dalam projek berbeza tidak berkongsi konfigurasi. Identiti diambil daripada sesi yang disahkan server, bukan input pengguna.
+
+AI membaca konfigurasi pemilik perbualan pada setiap permintaan, termasuk webhook WhatsApp dan simulator. Tiada fallback kepada `AI_*`, `OPENAI_API_KEY` global atau `platform_api_keys`. Pengguna tanpa konfigurasi AI sendiri menerima aliran handoff sedia ada. Pengguna lama perlu mengisi semula key sendiri; konfigurasi pemasangan lama tidak disalin automatik kerana pemiliknya tidak dapat ditentukan dengan selamat. Embedding menggunakan key akaun yang memilih OpenAI; provider lain menggunakan keyword fallback. Simpanan hanya menyemak format; ia tidak menguji key, kredit atau keupayaan model. Key kosong dikekalkan hanya daripada fail pengguna sama bagi provider dan endpoint sama.
+
+**Settings → Supabase** menyimpan profil URL dan key per akaun dalam fail peribadi yang sama. Key kosong dikekalkan hanya bagi projek sama dan akaun sama. Profil ini **belum menukar sambungan runtime**: login, dashboard, storage dan scheduled jobs masih menggunakan projek Supabase pemasangan dengan pengasingan data melalui RLS. Simpanan tidak memindahkan data, menguji credentials/schema atau menukar `.env` pemasangan. Pemilihan antara satu projek ber-RLS dan projek berasingan setiap akaun perlu diputuskan sebelum mengaktifkan sambungan per pengguna. Secret Supabase kekal di server; hanya status key tersimpan dipulangkan kepada browser.
+
+`.env` pemasangan ialah konfigurasi infrastruktur bootstrap operator, termasuk Auth, service key dan encryption key. Ia tidak menjadi sumber API key AI pengguna. Restart/build diperlukan hanya apabila operator menukar infrastruktur atau `VITE_*`; perubahan Provider AI per akaun berkuat kuasa pada permintaan seterusnya. Setiap pemasangan atau mesin mesti mempunyai direktori konfigurasi persisten yang sesuai. Jangan dedahkan `.lokalchat/` melalui static hosting atau masukkannya dalam pakej open-source. Cache dashboard juga dipisahkan mengikut sesi akaun; pertukaran pengguna tidak mengguna semula data cache akaun terdahulu.
 
 Token scheduled hook bukan env: `weekly_report_token` berada dalam `public.internal_settings` (akses service role sahaja). Cron membaca token pada runtime dan menghantarnya sebagai `x-report-token` ke `/api/public/hooks/weekly-report`. Menyalin template tidak mengaktifkan scheduler.
 

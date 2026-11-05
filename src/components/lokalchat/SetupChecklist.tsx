@@ -1,3 +1,4 @@
+import { usePreferences } from "@/components/lokalchat/usePreferences";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +21,7 @@ const STEPS: {
 ];
 
 export function SetupChecklist() {
+  const { translate: tr } = usePreferences();
   const qc = useQueryClient();
   const fetchChecklist = useApi(getSetupChecklist);
   const update = useApi(updateSetupChecklist);
@@ -47,8 +49,8 @@ export function SetupChecklist() {
       <div className="lc-setup lc-setup-done">
         <div className="lc-setup-check done">✓</div>
         <div>
-          <h2>Bot anda sudah hidup!</h2>
-          <p>Semua langkah persediaan selesai. Pelanggan kini boleh berbual dengan ejen AI anda.</p>
+          <h2>{tr("Bot anda sudah hidup!")}</h2>
+          <p>{tr("Semua langkah persediaan selesai. Pelanggan kini boleh berbual dengan ejen AI anda.")}</p>
         </div>
       </div>
     );
@@ -63,12 +65,12 @@ export function SetupChecklist() {
       <div className="lc-setup-head">
         <div>
           <h2>Setup Checklist</h2>
-          <p>{doneCount} daripada 4 langkah siap</p>
+          <p>{doneCount}{tr(" daripada 4 langkah siap")}</p>
         </div>
         <button
           type="button"
           className="lc-setup-close"
-          aria-label="Tutup checklist"
+          aria-label={tr("Tutup checklist")}
           disabled={mut.isPending}
           onClick={() =>
             mut.mutate("dismiss", {
@@ -91,17 +93,13 @@ export function SetupChecklist() {
             <li key={s.key} className={`lc-setup-step${done ? " done" : ""}${locked ? " locked" : ""}`}>
               <span className={`lc-setup-check${done ? " done" : ""}`}>{done ? "✓" : i + 1}</span>
               <div className="lc-setup-text">
-                <b>{s.title}</b>
-                <span>{locked ? "Siapkan langkah sebelumnya dahulu." : s.desc}</span>
+                <b>{tr(s.title)}</b>
+                <span>{locked ? tr("Siapkan langkah sebelumnya dahulu.") : tr(s.desc)}</span>
               </div>
               {isNext && !locked ? (
-                <Link to={s.to} {...(s.hash ? { hash: s.hash } : {})} className="lc-btn primary lc-setup-cta">
-                  Teruskan
-                </Link>
+                <Link to={s.to} {...(s.hash ? { hash: s.hash } : {})} className="lc-btn primary lc-setup-cta">{tr("Teruskan ")}</Link>
               ) : !done && !locked ? (
-                <Link to={s.to} {...(s.hash ? { hash: s.hash } : {})} className="lc-setup-link">
-                  Buka
-                </Link>
+                <Link to={s.to} {...(s.hash ? { hash: s.hash } : {})} className="lc-setup-link">{tr("Buka ")}</Link>
               ) : null}
             </li>
           );

@@ -1,4 +1,7 @@
+import type { User } from "@supabase/supabase-js";
+import { usePreferences } from "./usePreferences";
 import { BrandLogo } from "@/components/lokalchat/BrandLogo";
+import { ConsoleLayout } from "@/components/lokalchat/ConsoleLayout";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useApi } from "@/services/api";
@@ -14,18 +17,21 @@ function AccountCard() {
 
   useEffect(() => {
     let alive = true;
-    supabase.auth.getUser().then(async ({ data }) => {
-      const u = data.user;
+    const updateUser = (u: User | null) => {
       if (!u || !alive) return;
       const email = u.email ?? "";
-      const meta = (u.user_metadata ?? {}) as Record<string, string | undefined>;
-      const name = meta["full_name"] || meta["name"] || email.split("@")[0] || "Pengguna";
-      let avatar = meta["avatar_url"] || meta["picture"] || null;
-
-      if (alive) setInfo({ name, email, avatar });
-    });
+      const meta = u.user_metadata ?? {};
+      const string = (key: string) => typeof meta[key] === "string" ? meta[key] as string : "";
+      const name = string("full_name") || string("name") || email.split("@")[0] || "Pengguna";
+      const avatar = string("avatar_url") || string("picture") || null;
+      setInfo({ name, email, avatar });
+      setImgFailed(false);
+    };
+    void supabase.auth.getUser().then(({ data }) => updateUser(data.user)).catch(() => {});
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => updateUser(session?.user ?? null));
     return () => {
       alive = false;
+      data.subscription.unsubscribe();
     };
   }, []);
 
@@ -101,6 +107,7 @@ function NavIconAdmin() {
 }
 
 export function ConsoleShell({ children }: { children: ReactNode }) {
+  const { t } = usePreferences();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -110,8 +117,8 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 
 
   return (
-    <div className="lc-app">
-      <aside className="lc-sidebar">
+    <ConsoleLayout sidebar={
+      <>
         <div className="lc-logo">
           <BrandLogo />
         </div>
@@ -121,7 +128,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             className={`lc-nav-item${pathname === "/dashboard" ? " active" : ""}`}
           >
             <NavIconDashboard />
-            Dashboard
+            {t("Dashboard", "Dashboard")}
           </Link>
           <Link
             to="/dashboard/inbox"
@@ -137,7 +144,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             }`}
           >
             <NavIconKb />
-            Knowledge Base
+            {t("Knowledge Base", "Knowledge Base")}
           </Link>
           <Link
             to="/dashboard/unanswered"
@@ -147,7 +154,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
               <circle cx="12" cy="12" r="9" />
               <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01" />
             </svg>
-            Soalan Tak Dijawab
+            {t("Soalan Tak Dijawab", "Unanswered questions")}
           </Link>
           <Link
             to="/dashboard/settings"
@@ -156,7 +163,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             }`}
           >
             <NavIconSettings />
-            Settings
+            {t("Tetapan", "Settings")}
           </Link>
           {isAdmin && (
             <Link
@@ -173,16 +180,17 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 
         <div className="lc-sidebar-foot">
           <button type="button" onClick={async () => {
-            const { error } = await supabase.auth.signOut();
+            const { error } = await supabase.auth.signOut({ scope: "local" });
             if (error) { toast.error(error.message); return; }
             queryClient.clear();
             await navigate({ to: "/auth" });
-          }}>Log keluar</button>
+          }}>{t("Log keluar", "Sign out")}</button>
         </div>
         <AccountCard />
-      </aside>
-      <main className="lc-main">{children}</main>
-    </div>
+      </>
+    }>
+      {children}
+    </ConsoleLayout>
   );
 }
 

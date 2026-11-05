@@ -1,4 +1,5 @@
 import { BrandLogo } from "@/components/lokalchat/BrandLogo";
+import { ThemeToggle } from "@/components/lokalchat/ThemeToggle";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
@@ -27,6 +28,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <span className="lc-logo-tag">ADMIN</span>
         </div>
 
+        <div className="lc-theme-row"><span>Tema</span><ThemeToggle /></div>
         <nav className="lc-nav">
           <div className="lc-nav-group-label">Platform</div>
           <Link to="/admin/analytics" className="lc-nav-item active">

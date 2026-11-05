@@ -1,18 +1,18 @@
 /**
  * Embedding helpers (server-only).
  *
- * Uses OpenAI `text-embedding-3-small` (1536 dims) when OPENAI_API_KEY is set.
- * When the key is absent the app degrades gracefully: FAQ entries are stored
+ * Uses OpenAI `text-embedding-3-small` (1536 dims) with the owner’s saved OpenAI key.
+ * When that provider is absent the app degrades gracefully: FAQ entries are stored
  * without an embedding and `search_faq` falls back to keyword matching.
  */
 
-export function hasEmbeddingProvider(): boolean {
-  return Boolean(process.env["OPENAI_API_KEY"]);
-}
+import { getSavedLlmConfig } from "./llm-env.server";
 
-export async function createEmbedding(input: string): Promise<number[] | null> {
-  const apiKey = process.env["OPENAI_API_KEY"];
-  if (!apiKey) return null;
+export async function createEmbedding(input: string, userId: string): Promise<number[] | null> {
+  // Optional embeddings use this owner's OpenAI key only; other providers use keywords.
+  const config = await getSavedLlmConfig(userId);
+  if (!config || config.baseUrl !== "https://api.openai.com/v1") return null;
+  const apiKey = config.apiKey;
 
   try {
     const res = await fetch("https://api.openai.com/v1/embeddings", {

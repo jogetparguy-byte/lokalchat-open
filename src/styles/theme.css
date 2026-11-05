@@ -1,0 +1,94 @@
+/* Shared control: one quiet sliding disc, with no page-sized reveal animation. */
+:root {
+  --theme-track: #e6ece8;
+  --theme-thumb: #ffffff;
+  --theme-ink: #173d2d;
+  --theme-muted: #5b6b63;
+}
+
+.dark {
+  --theme-track: #2a332e;
+  --theme-thumb: #45594c;
+  --theme-ink: #e6f7ed;
+  --theme-muted: #a5b7ac;
+}
+
+.lc-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 76px;
+  height: 44px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--theme-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lc-theme-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  place-items: center;
+  width: 76px;
+  height: 36px;
+  border-radius: inherit;
+  background: var(--theme-track);
+  isolation: isolate;
+}
+
+.lc-theme-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: -1;
+  width: 32px;
+  height: 30px;
+  border-radius: inherit;
+  background: var(--theme-thumb);
+}
+
+.lc-theme-sun { color: var(--theme-ink); }
+.lc-theme-moon { color: var(--theme-muted); }
+.dark .lc-theme-thumb { transform: translateX(38px); }
+.dark .lc-theme-sun { color: var(--theme-muted); }
+.dark .lc-theme-moon { color: var(--theme-ink); }
+.lc-theme-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.lc-theme-toggle:hover .lc-theme-track { outline: 1px solid var(--theme-muted); outline-offset: 1px; }
+
+.lc-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-inline: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* The official JPEG stays intact. Screen blending removes its inverted canvas. */
+.dark .lc-brand-artwork { mix-blend-mode: screen !important; }
+.dark .lc-brand-artwork img { filter: invert(1) hue-rotate(180deg); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .lc-theme-track { transition: background-color 180ms ease; }
+  .lc-theme-thumb { transition: transform 220ms cubic-bezier(.2,.7,.3,1), background-color 180ms ease; }
+  .lc-theme-toggle svg { transition: color 180ms ease, transform 220ms ease; }
+  .lc-theme-toggle:active svg { transform: scale(.88); }
+  body, .lc-app, .lc-sidebar, .lc-card, .lc-panel, .lc-insight,
+  .lc-setup, .lc-range, .lc-account, .lc-sidebar-foot,
+  .lc-landing, .lc-demo, .lc-footer, .lc-conversation, .lc-conversation-header,
+  .lc-demo-reply, .lc-message, .lc-npm-placeholder, .surface-panel {
+    transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-theme-toggle, .lc-theme-toggle * { transition: none !important; animation: none !important; }
+  .lc-app .lc-pulse-dot, .animate-flash-alert { animation: none !important; }
+}

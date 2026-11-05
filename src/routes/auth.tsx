@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { hasPublicConfig } from "@/lib/public-config";
 import { BrandLogo } from "@/components/lokalchat/BrandLogo";
+import { ThemeToggle } from "@/components/lokalchat/ThemeToggle";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -36,7 +38,7 @@ function AuthPage() {
   const [ready, setReady] = useState(false);
   useEffect(() => { setReady(true); }, []);
 
-  const configured = Boolean(import.meta.env["VITE_SUPABASE_URL"] && import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]);
+  const configured = hasPublicConfig(import.meta.env["VITE_SUPABASE_URL"], import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]);
 
   useEffect(() => {
     if (!configured) return;
@@ -90,9 +92,12 @@ function AuthPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md">
-        <Link to="/" className="mb-6 block text-center text-sm text-muted-foreground hover:text-foreground">
-          ← Kembali ke laman utama
-        </Link>
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
+            ← Kembali ke laman utama
+          </Link>
+          <ThemeToggle />
+        </div>
         <div className="surface-panel p-7">
           <div className="mb-4 flex justify-center">
             <BrandLogo width={176} />

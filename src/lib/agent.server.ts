@@ -6,6 +6,7 @@
  * HTTP fetch) and trigger_human_handoff (pauses the bot for this chat).
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { accountPreferences, replyInstruction, type ReplyLanguage } from "./preferences";
 import { createEmbedding } from "./embeddings.server";
 import { sendWhatsAppMessage } from "./whatsapp.server";
 
@@ -83,7 +84,7 @@ type ChatMessage = {
 
 async function searchFaq(query: string, businessId: string | null): Promise<string> {
   if (!businessId) return "TIADA_JAWAPAN_DALAM_FAQ";
-  const embedding = await createEmbedding(query);
+  const embedding = await createEmbedding(query, businessId);
 
   if (embedding) {
     const { data, error } = await supabaseAdmin.rpc("match_documents", {
@@ -178,12 +179,21 @@ async function loadHistory(chatId: string): Promise<ChatMessage[]> {
     }));
 }
 
-async function callGateway(messages: ChatMessage[]) {
+async function callGateway(messages: ChatMessage[], businessId: string | null) {
   const { getActiveLlmConfig } = await import("./platform-key.server");
-  const { baseUrl, model, apiKey } = await getActiveLlmConfig();
+  if (!businessId) throw new Error("Pemilik perbualan tidak ditemui");
+  const { baseUrl, model, apiKey } = await getActiveLlmConfig(businessId);
+
+  // Recheck user-selected endpoints at request time, including DNS changes.
+  const { LLM_PROVIDERS } = await import("./llm-settings");
+  if (!Object.values(LLM_PROVIDERS).some(provider => provider.baseUrl === baseUrl)) {
+    const { assertPublicHttpUrl } = await import("./ssrf.server");
+    await assertPublicHttpUrl(baseUrl);
+  }
 
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
+    redirect: "error",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
@@ -232,10 +242,17 @@ export async function runAgent(params: {
     .maybeSingle();
   const businessId = chatRow?.business_id ?? null;
 
+  let replyLanguage: ReplyLanguage = "auto";
+  if (businessId) {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(businessId);
+    if (!error && data.user) replyLanguage = accountPreferences(data.user.user_metadata).replyLanguage;
+  }
+  const languageInstruction = replyInstruction(replyLanguage);
+  const handoffReply = replyLanguage === "en" ? "I’m connecting you to the store owner now." : HANDOFF_REPLY;
   const history = await loadHistory(chatId);
 
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: `${SYSTEM_PROMPT}\n${languageInstruction}` },
     ...history,
   ];
   if (history.at(-1)?.content !== userMessage) {
@@ -247,7 +264,7 @@ export async function runAgent(params: {
 
   try {
     for (let step = 0; step < 4; step += 1) {
-      const completion = await callGateway(messages);
+      const completion = await callGateway(messages, businessId);
       const choice = completion.choices?.[0]?.message;
       if (!choice) break;
 
@@ -292,21 +309,22 @@ export async function runAgent(params: {
       }
 
       if (handedOff) {
-        reply = HANDOFF_REPLY;
+        reply = handoffReply;
         break;
       }
     }
   } catch (error) {
     console.error("Agent run failed", error);
-    reply =
-      "Maaf boss, sistem saya ada gangguan sekejap. Saya panggil pemilik kedai ya.";
+    reply = replyLanguage === "en"
+      ? "The assistant is temporarily unavailable. I’m contacting the store owner for you."
+      : "Maaf boss, sistem saya ada gangguan sekejap. Saya panggil pemilik kedai ya.";
     if (!handedOff) {
       await triggerHumanHandoff(chatId);
       handedOff = true;
     }
   }
 
-  if (!reply) reply = HANDOFF_REPLY;
+  if (!reply) reply = handoffReply;
 
   const { data: botMessage, error: botInsertError } = await supabaseAdmin
     .from("messages")
