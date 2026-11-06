@@ -125,13 +125,13 @@ async function checkStock(productName: string, businessId: string | null): Promi
 
 
   try {
-    const { assertPublicHttpUrl } = await import("./ssrf.server");
-    const url = await assertPublicHttpUrl(baseUrl);
+    const { publicHttpFetch } = await import("./ssrf.server");
+    const url = new URL(baseUrl);
     url.searchParams.set("product", productName);
-    const res = await fetch(url.toString(), {
+    const res = await publicHttpFetch(url.toString(), {
       headers: { Accept: "application/json" },
-      redirect: "error",
-      signal: AbortSignal.timeout(8000),
+      timeoutMs: 8000,
+      maxResponseBytes: 64 * 1024,
     });
     if (!res.ok) return `Gagal semak stok (status ${res.status}).`;
     const contentLength = Number(res.headers.get("content-length") ?? 0);
@@ -184,16 +184,9 @@ async function callGateway(messages: ChatMessage[], businessId: string | null) {
   if (!businessId) throw new Error("Pemilik perbualan tidak ditemui");
   const { baseUrl, model, apiKey } = await getActiveLlmConfig(businessId);
 
-  // Recheck user-selected endpoints at request time, including DNS changes.
-  const { LLM_PROVIDERS } = await import("./llm-settings");
-  if (!Object.values(LLM_PROVIDERS).some(provider => provider.baseUrl === baseUrl)) {
-    const { assertPublicHttpUrl } = await import("./ssrf.server");
-    await assertPublicHttpUrl(baseUrl);
-  }
-
-  const res = await fetch(`${baseUrl}/chat/completions`, {
+  const { publicHttpFetch } = await import("./ssrf.server");
+  const res = await publicHttpFetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    redirect: "error",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
@@ -203,7 +196,7 @@ async function callGateway(messages: ChatMessage[], businessId: string | null) {
       messages,
       tools: TOOLS,
     }),
-    signal: AbortSignal.timeout(30000),
+    timeoutMs: 30000,
   });
 
   if (res.status === 429) throw new Error("RATE_LIMIT");

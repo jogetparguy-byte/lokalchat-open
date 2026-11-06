@@ -1,11 +1,17 @@
 /**
  * Server-only text extraction + chunking for knowledge base documents.
- * Supports PDF (unpdf), DOCX (fflate + document.xml) and CSV/TXT.
+ * Supports PDF (unpdf), DOCX (bounded ZIP worker) and CSV/TXT.
  */
-import { unzipSync, strFromU8 } from "fflate";
+import { strFromU8 } from "fflate";
+import { readDocxText, MAX_DOCUMENT_TEXT } from "./docx-worker.server";
+export { MAX_DOCUMENT_TEXT };
 
 function normalize(text: string): string {
-  return text.replace(/\r/g, "\n").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return text
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 async function extractPdf(bytes: Uint8Array): Promise<string> {
@@ -15,40 +21,41 @@ async function extractPdf(bytes: Uint8Array): Promise<string> {
   return Array.isArray(text) ? text.join("\n") : text;
 }
 
-function extractDocx(bytes: Uint8Array): string {
-  const files = unzipSync(bytes);
-  const doc = files["word/document.xml"];
-  if (!doc) throw new Error("Fail DOCX tidak sah");
-  const xml = strFromU8(doc);
-  return xml
-    .replace(/<w:p[^>]*>/g, "\n")
-    .replace(/<w:tab[^>]*\/>/g, " ")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
-}
-
 export async function extractDocumentText(
   fileType: string,
   bytes: Uint8Array,
 ): Promise<string> {
+  if (bytes.length === 0 || bytes.length > 10 * 1024 * 1024)
+    throw new Error("Saiz fail melebihi had");
   const type = fileType.toLowerCase();
-  if (type === "pdf") return normalize(await extractPdf(bytes));
-  if (type === "docx" || type === "doc") return normalize(extractDocx(bytes));
-  if (type === "csv" || type === "txt") return normalize(strFromU8(bytes));
-  throw new Error(`Jenis fail tidak disokong: ${fileType}`);
+  let text: string;
+  if (type === "pdf") text = await extractPdf(bytes);
+  else if (type === "docx" || type === "doc") text = await readDocxText(bytes);
+  else if (type === "csv" || type === "txt") text = strFromU8(bytes);
+  else throw new Error(`Jenis fail tidak disokong: ${fileType}`);
+  if (text.length > MAX_DOCUMENT_TEXT)
+    throw new Error("Teks dokumen terlalu panjang");
+  return normalize(text);
 }
 
 /** Split text into ~1000 character chunks with a small overlap. */
 export function chunkText(text: string, size = 1000, overlap = 150): string[] {
+  if (
+    !Number.isInteger(size) ||
+    !Number.isInteger(overlap) ||
+    size <= 0 ||
+    overlap < 0 ||
+    overlap >= size
+  ) {
+    throw new Error("Tetapan chunk tidak sah");
+  }
+  if (text.length > MAX_DOCUMENT_TEXT)
+    throw new Error("Teks dokumen terlalu panjang");
   const clean = text.trim();
   if (!clean) return [];
   const chunks: string[] = [];
   let start = 0;
-  while (start < clean.length) {
+  while (start < clean.length && chunks.length < 200) {
     let end = Math.min(start + size, clean.length);
     if (end < clean.length) {
       const breakPoint = clean.lastIndexOf("\n", end);
@@ -63,4 +70,3 @@ export function chunkText(text: string, size = 1000, overlap = 150): string[] {
   }
   return chunks.slice(0, 200);
 }
-
