@@ -350,29 +350,23 @@ test("agent applies the saved account reply language to the real gateway prompt"
         };
       },
     };
-    const { runAgent } = load(
-      "../src/lib/agent.server.ts",
-      {
-        "@/integrations/supabase/client.server": { supabaseAdmin: admin },
-        "./preferences": { accountPreferences, replyInstruction },
-        "./embeddings.server": {},
-        "./whatsapp.server": {},
-        "./platform-key.server": {
-          async getActiveLlmConfig(ownerId) {
-            assert.equal(ownerId, "owner-a");
-            return {
-              apiKey: "fixture-key",
-              model: "fixture-chat",
-              baseUrl: "https://fixture.test",
-            };
-          },
-        },
-        "./llm-settings": {
-          LLM_PROVIDERS: { fixture: { baseUrl: "https://fixture.test" } },
+    const { runAgent } = load("../src/lib/agent.server.ts", {
+      "@/integrations/supabase/client.server": { supabaseAdmin: admin },
+      "./preferences": { accountPreferences, replyInstruction },
+      "./embeddings.server": {},
+      "./whatsapp.server": {},
+      "./platform-key.server": {
+        async getActiveLlmConfig(ownerId) {
+          assert.equal(ownerId, "owner-a");
+          return {
+            apiKey: "fixture-key",
+            model: "fixture-chat",
+            baseUrl: "https://fixture.test",
+          };
         },
       },
-      {
-        fetch: async (_url, init) => {
+      "./ssrf.server": {
+        publicHttpFetch: async (_url, init) => {
           prompts.push(JSON.parse(init.body));
           return {
             status: 200,
@@ -387,7 +381,7 @@ test("agent applies the saved account reply language to the real gateway prompt"
           };
         },
       },
-    );
+    });
     const result = await runAgent({
       chatId: "chat-a",
       customerPhone: "60123456789",
