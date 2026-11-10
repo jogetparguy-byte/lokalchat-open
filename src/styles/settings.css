@@ -285,12 +285,15 @@
   min-height: 44px;
   padding: 10px 20px;
   border-radius: 8px;
-  background: #1d4ed8;
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  background: var(--primary);
+  color: var(--primary-button-ink, var(--primary-foreground));
   font-size: 14px;
   font-weight: 600;
 }
-.lc-settings-donate:disabled {
-  cursor: not-allowed;
+.lc-settings-donate:hover {
+  filter: brightness(0.95);
 }
-
