@@ -288,6 +288,31 @@ function AboutPanel() {
           </div>
         </dl>
       </SettingsBlock>
+      <section className="lc-settings-support" aria-labelledby="lokalchat-support-title">
+        <div>
+          <h2 id="lokalchat-support-title">Support LokalChat</h2>
+          <p>
+            {t(
+              "Bantu menyokong pembangunan LokalChat.",
+              "Help support the development of LokalChat.",
+            )}
+          </p>
+          <p id="lokalchat-donate-status" className="lc-settings-support-status">
+            {t(
+              "Sumbangan belum tersedia. Pilihan bayaran akan ditambah nanti.",
+              "Donations are not available yet. Payment options are coming soon.",
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="lc-settings-donate"
+          disabled
+          aria-describedby="lokalchat-donate-status"
+        >
+          Donate
+        </button>
+      </section>
       <SettingsBlock title={t("Panduan & bantuan", "Guides & help")}>
         <a
           className="lc-settings-help-link"
@@ -337,3 +362,4 @@ function AboutPanel() {
     </>
   );
 }
+
