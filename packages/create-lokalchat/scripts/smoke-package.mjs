@@ -24,7 +24,7 @@ delete env.NODE_TEST_CONTEXT;
 
 async function npx(cliArgs, expectedStatus = 0) {
   const commandArgs = [npmCli, 'exec', '--offline', '--yes', '--cache', join(sandbox, 'npm-cache'),
-    '--package', archive, '--', 'create-lokalchat', ...cliArgs];
+    '--package', archive, '--', 'lokalchat', ...cliArgs];
   // File descriptors also work on hosts that cannot capture subprocess pipes.
   const stdoutPath = join(outputDirectory, 'stdout');
   const stderrPath = join(outputDirectory, 'stderr');

@@ -134,7 +134,7 @@ try {
   await mkdir(join(workdir, 'supabase'));
   await cp(join(root, 'supabase/migrations'), join(workdir, 'supabase/migrations'), { recursive: true });
   const filenames = (await readdir(join(root, 'supabase/migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(filenames.length, 25, 'Expected all 25 canonical migrations; update verification deliberately if the chain changes');
+  assert.equal(filenames.length, 26, 'Expected all 26 canonical migrations; update verification deliberately if the chain changes');
   for (const name of filenames) result.migrations.push({ name, version: name.split('_')[0], sha256: createHash('sha256').update(await readFile(join(root, 'supabase/migrations', name))).digest('hex') });
   const [apiPort, dbPort, shadowPort] = await Promise.all([freePort(), freePort(), freePort()]);
   assert.equal(new Set([apiPort, dbPort, shadowPort]).size, 3, 'Ports must be distinct');
@@ -143,7 +143,7 @@ try {
   proxy = await startLoopbackDockerProxy({ upstreamSocket: options['docker-socket'], socketPath: join(workdir, 'docker.sock'), projectId });
   console.log(`Disposable project: ${projectId}; private logs: ${workdir}`);
   const excluded = 'realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor';
-  await stage('Fresh Supabase stack and initial 25 migrations', () => cli(['start', '--exclude', excluded]));
+  await stage('Fresh Supabase stack and initial 26 migrations', () => cli(['start', '--exclude', excluded]));
   await stage('Verify guarded runtime and loopback bindings', async () => {
     assert.ok(proxy.createCount > 0, 'Container creation bypassed the guarded socket');
     const snapshot = await auditResources('initial-start');

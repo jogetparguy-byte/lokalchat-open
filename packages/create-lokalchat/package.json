@@ -1,10 +1,11 @@
 {
-  "name": "create-lokalchat",
-  "version": "0.2.0",
+  "name": "lokalchat",
+  "version": "0.2.1",
   "description": "Create LokalChat Open with a guided local database and app launcher",
   "type": "module",
   "bin": {
-    "create-lokalchat": "bin/create-lokalchat.mjs"
+    "create-lokalchat": "bin/create-lokalchat.mjs",
+    "lokalchat": "bin/create-lokalchat.mjs"
   },
   "files": [
     "bin",
@@ -26,5 +27,10 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/",
     "tag": "latest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jogetparguy-byte/lokalchat-open.git",
+    "directory": "packages/create-lokalchat"
   }
 }

@@ -25,17 +25,19 @@ export async function createEmbedding(input: string, userId: string): Promise<nu
         model: "text-embedding-3-small",
         input: input.slice(0, 8000),
       }),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
-      console.error("Embedding request failed", res.status, await res.text());
+      const errorText = await res.text().catch(() => "");
+      console.error("Embedding request failed", { status: res.status, hasBody: errorText.length > 0 });
       return null;
     }
 
     const json = (await res.json()) as { data?: Array<{ embedding: number[] }> };
     return json.data?.[0]?.embedding ?? null;
   } catch (error) {
-    console.error("Embedding request threw", error);
+    console.error("Embedding request threw", { message: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }

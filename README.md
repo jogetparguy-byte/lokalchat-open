@@ -3,7 +3,7 @@
 ## Install untuk developer
 
 ```sh
-npx create-lokalchat@latest my-lokalchat
+npx lokalchat@latest my-lokalchat
 cd my-lokalchat
 npm run setup:local
 ```

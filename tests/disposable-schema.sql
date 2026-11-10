@@ -46,6 +46,7 @@ DECLARE
   owner_a uuid := gen_random_uuid();
   owner_b uuid := gen_random_uuid();
   chat_a uuid;
+  document_id uuid;
   inbound_id text := gen_random_uuid()::text;
   reply_id uuid;
   human_id uuid;
@@ -62,6 +63,20 @@ BEGIN
   IF (SELECT business_name FROM public.profiles WHERE id = owner_a) IS DISTINCT FROM 'Disposable A'
     THEN RAISE EXCEPTION 'Signup trigger did not create the expected profile'; END IF;
   RAISE NOTICE 'PASS signup trigger creates a backend-compatible profile';
+
+  INSERT INTO public.kb_documents (business_id, file_name, file_type, file_size, storage_path, status)
+    VALUES (owner_a, 'status.txt', 'TXT', 1, owner_a::text || '/status.txt', 'pending') RETURNING id INTO document_id;
+  UPDATE public.kb_documents SET status = 'processing' WHERE id = document_id AND status = 'pending';
+  IF (SELECT status FROM public.kb_documents WHERE id = document_id) <> 'processing'
+    THEN RAISE EXCEPTION 'Document worker cannot claim pending metadata'; END IF;
+  UPDATE public.kb_documents SET status = 'processed' WHERE id = document_id;
+  UPDATE public.kb_documents SET status = 'failed' WHERE id = document_id;
+  BEGIN
+    UPDATE public.kb_documents SET status = 'invalid' WHERE id = document_id;
+    RAISE EXCEPTION 'Unknown KB status accepted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS KB pending/processing/processed/failed contract and invalid status rejection';
+
 
   INSERT INTO public.chats (business_id, customer_phone) VALUES (owner_a, 'disposable-same-phone') RETURNING id INTO chat_a;
   INSERT INTO public.chats (business_id, customer_phone) VALUES (owner_b, 'disposable-same-phone');

@@ -8,10 +8,34 @@ function record(error: unknown) {
   lastCapturedError = { error, at: Date.now() };
 }
 
+// Patterns to redact from error messages/stacks
+const REDACTION_PATTERNS = [
+  /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi,
+  /api[_-]?key["'\s:=]+[A-Za-z0-9\-._~+/]+=*/gi,
+  /access[_-]?token["'\s:=]+[A-Za-z0-9\-._~+/]+=*/gi,
+  /secret["'\s:=]+[A-Za-z0-9\-._~+/]+=*/gi,
+  /password["'\s:=]+[^\s"']+/gi,
+  /authorization["'\s:=]+[^\s"']+/gi,
+  /sk-[A-Za-z0-9]{20,}/g,
+  /sk_live_[A-Za-z0-9]{20,}/g,
+  /sk_test_[A-Za-z0-9]{20,}/g,
+];
+
+function redactSensitive(text: string): string {
+  let result = text;
+  for (const pattern of REDACTION_PATTERNS) {
+    result = result.replace(pattern, (match) => {
+      const prefix = match.split(/["'\s:=]+/)[0];
+      return `${prefix}=[REDACTED]`;
+    });
+  }
+  return result;
+}
+
 // h3's HTTPError serializes to {"status":500,"unhandled":true,"message":"HTTPError"} —
 // no stack, no cause — so a plain console.error(error) reaches the log pipeline with
 // the failure detail stripped. Expand Error-like args into a string that keeps the
-// message, stack, and the full cause chain.
+// message, stack, and the full cause chain (with sensitive data redacted).
 const CAUSE_DEPTH_LIMIT = 5;
 const DESCRIPTION_LENGTH_LIMIT = 8_000;
 
@@ -20,12 +44,14 @@ export function describeError(error: unknown): string {
   let current: unknown = error;
   for (let depth = 0; depth < CAUSE_DEPTH_LIMIT && current != null; depth++) {
     if (!(current instanceof Error)) {
-      parts.push(typeof current === "string" ? current : safeStringify(current));
+      const str = typeof current === "string" ? current : safeStringify(current);
+      parts.push(redactSensitive(str));
       break;
     }
     const label = depth === 0 ? "" : "caused by: ";
     const status = describeStatus(current);
-    parts.push(`${label}${current.stack ?? `${current.name}: ${current.message}`}${status}`);
+    const stackOrMsg = current.stack ?? `${current.name}: ${current.message}`;
+    parts.push(`${label}${redactSensitive(stackOrMsg)}${status}`);
     current = current.cause;
   }
   return parts.join("\n").slice(0, DESCRIPTION_LENGTH_LIMIT);

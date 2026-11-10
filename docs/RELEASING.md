@@ -8,8 +8,8 @@ Pakej CLI berada dalam `packages/create-lokalchat`. Ia membundel snapshot aplika
 npm test --prefix packages/create-lokalchat
 npm pack ./packages/create-lokalchat --pack-destination /tmp
 # Gunakan nama tarball sebenar yang dipaparkan oleh npm pack:
-npm run test:package --prefix packages/create-lokalchat -- /tmp/create-lokalchat-0.2.0.tgz
-npx --yes --package /tmp/create-lokalchat-0.2.0.tgz create-lokalchat /tmp/lokalchat-smoke --skip-install
+npm run test:package --prefix packages/create-lokalchat -- /tmp/lokalchat-0.2.0.tgz
+npx --yes --package /tmp/lokalchat-0.2.0.tgz lokalchat /tmp/lokalchat-smoke --skip-install
 cd /tmp/lokalchat-smoke
 npm install --include=dev
 npm test
@@ -31,10 +31,10 @@ Semak senarai dan kandungan tarball sebelum penerbitan: tiada `.env` sebenar, `.
 
 ## Gate penerbitan manual
 
-Semak pemilikan nama npm `create-lokalchat`, login/2FA maintainer dan versi unik. `E404` daripada registry bermakna pakej tidak dapat ditemukan; ia tidak menjamin nama akan diluluskan atau boleh didaftarkan. Jika sudah wujud, semak maintainer sebelum meneruskan. Jangan kongsi token atau kod OTP dalam chat.
+Semak pemilikan nama npm `lokalchat`, login/2FA maintainer dan versi unik. `E404` daripada registry bermakna pakej tidak dapat ditemukan; ia tidak menjamin nama akan diluluskan atau boleh didaftarkan. Jika sudah wujud, semak maintainer sebelum meneruskan. Jangan kongsi token atau kod OTP dalam chat.
 
 ```sh
-npm view create-lokalchat name version dist-tags maintainers --json --registry=https://registry.npmjs.org/
+npm view lokalchat name version dist-tags maintainers --json --registry=https://registry.npmjs.org/
 npm whoami --registry=https://registry.npmjs.org/
 # Jika belum login, jalankan secara interaktif pada terminal sendiri:
 npm login --registry=https://registry.npmjs.org/
@@ -43,9 +43,9 @@ npm login --registry=https://registry.npmjs.org/
 Dapatkan izin penerbitan sebelum arahan publish. Terbitkan **tarball sama yang telah disemak**, bukannya folder sumber yang boleh berubah selepas audit. Semakan dry-run tidak menerbitkan pakej dan tidak membuktikan hak akaun untuk menerbitkan.
 
 ```sh
-npm publish /tmp/create-lokalchat-0.2.0.tgz --dry-run --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
+npm publish /tmp/lokalchat-0.2.0.tgz --dry-run --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
 # Hanya selepas mendapat izin penerbitan:
-npm publish /tmp/create-lokalchat-0.2.0.tgz --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
+npm publish /tmp/lokalchat-0.2.0.tgz --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
 ```
 
 Flag `--ignore-scripts` mengelakkan lifecycle scripts dijalankan semula semasa menerbitkan snapshot yang telah dipack dan diuji. `--tag latest` menjadikan versi ini sasaran `@latest`. Jangan pack semula atau ubah tarball selepas semakan; perubahan memerlukan pack dan semakan baharu.
@@ -53,8 +53,8 @@ Flag `--ignore-scripts` mengelakkan lifecycle scripts dijalankan semula semasa m
 Selepas diterbitkan, semak versi dan uji dalam folder baharu di luar repo sumber:
 
 ```sh
-npm view create-lokalchat@latest version --registry=https://registry.npmjs.org/
-npx create-lokalchat@latest
+npm view lokalchat@latest version --registry=https://registry.npmjs.org/
+npx lokalchat@latest
 cd lokalchat-app
 npm run setup:local
 ```
@@ -62,3 +62,25 @@ npm run setup:local
 Penerbitan registry adalah tindakan luaran berasingan daripada audit ini. Setakat pakej belum diterbitkan, arahan `@latest` belum disahkan dari registry dan tidak boleh dianggap tersedia.
 
 Jangan push GitHub atau menulis semula sejarah Lovable tanpa arahan pengguna. Persediaan, pack dan ujian lokal tidak menerbitkan ke npm atau GitHub.
+
+## Release daripada GitHub
+
+Workflow `.github/workflows/npm-release.yml` menguji PR/main dan manual dispatch tanpa publish.
+Tag stabil `vX.Y.Z` sahaja menerbitkan package `lokalchat`, selepas ujian aplikasi,
+typecheck, build, audit env, ujian installer dan smoke tarball. Publish menggunakan
+artefak yang sama daripada job verify, tanpa membina semula template.
+
+Persediaan pemilik sekali sahaja:
+1. Cipta GitHub Environment `npm`; tetapkan reviewer jika dikehendaki.
+2. Dalam npmjs.com > lokalchat > Settings > Trusted Publisher, pilih GitHub Actions:
+   owner `jogetparguy-byte`, repo `lokalchat-open`, workflow `npm-release.yml`, environment `npm`.
+   Benarkan direct publish (`npm publish`). Tiada token npm jangka panjang diperlukan.
+3. Merge branch integrasi selepas CI lulus. Semak commit dan versi installer sebelum
+   mencipta tag `v0.2.1` pada commit yang telah disemak dan push tag itu.
+4. Tunggu workflow; semak integrity/latest dan jalankan pemasangan sebenar daripada registry.
+
+Versi 0.2.1 ialah calon seterusnya, bukan bukti sudah diterbitkan. Source asal 0.2.0
+ialah snapshot lokal; commit GitHub baharu tidak boleh dianggap sama dengan tarball lama.
+Scaffold sedia ada tidak dikemas kini secara automatik. Migration baharu mesti turut
+diaplikasikan bagi aplikasi pengguna sedia ada. Ujian CI ini tidak menjalankan Docker,
+WhatsApp sebenar atau AI berbayar.

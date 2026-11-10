@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "start": "node --env-file-if-exists=.env .output/server/index.mjs",
-    "test": "node --import tsx tests/upload-document.test.mjs && node --import tsx tests/inbox.test.tsx && node tests/backend-delivery.test.mjs && node tests/delivery-error.test.mjs && node tests/check-env.test.mjs && node --import tsx --test tests/public-config.test.mjs && node tests/local-setup.test.mjs && npm run test:llm-settings && npm run test:supabase-settings && npm run test:theme && npm run test:settings && npm run test:tenant-env",
+    "test": "node --import tsx tests/upload-document.test.mjs && node --import tsx tests/inbox.test.tsx && node tests/backend-delivery.test.mjs && node tests/delivery-error.test.mjs && node tests/check-env.test.mjs && node --import tsx --test tests/public-config.test.mjs && node tests/local-setup.test.mjs && npm run test:llm-settings && npm run test:supabase-settings && npm run test:theme && npm run test:settings && npm run test:tenant-env && node --import tsx tests/release-security.test.mjs",
     "test:theme": "node --import tsx tests/theme.test.mjs",
     "test:theme:ssr": "node tests/theme-ssr.mjs",
     "test:browser": "node tests/browser.test.mjs",
@@ -30,7 +30,8 @@
     "test:supabase-settings": "node --import tsx tests/supabase-settings.test.mjs",
     "test:supabase-settings:browser": "node tests/supabase-settings-browser.mjs",
     "test:settings": "node --import tsx tests/settings.test.mjs",
-    "test:tenant-env": "node --import tsx tests/tenant-env.test.mjs"
+    "test:tenant-env": "node --import tsx tests/tenant-env.test.mjs",
+    "test:supabase-integration": "node --import tsx tests/supabase-integration.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

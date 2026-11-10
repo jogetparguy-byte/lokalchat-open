@@ -41,7 +41,17 @@ export const Route = createFileRoute("/api/public/whatsapp")({
       },
 
       POST: async ({ request }) => {
+        // Limit webhook body size to 1MB to prevent resource exhaustion
+        const MAX_BODY_SIZE = 1024 * 1024;
+        const contentLength = request.headers.get("content-length");
+        if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+          return new Response("Payload too large", { status: 413 });
+        }
+
         const rawBody = await request.text();
+        if (rawBody.length > MAX_BODY_SIZE) {
+          return new Response("Payload too large", { status: 413 });
+        }
         const signature = request.headers.get("x-hub-signature-256");
 
         let payload: any;
