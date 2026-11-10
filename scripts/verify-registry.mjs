@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
 const pkg = JSON.parse(readFileSync('packages/create-lokalchat/package.json'));
 const expected = 'sha512-' + createHash('sha512').update(readFileSync(process.argv[2])).digest('base64');
-for (let attempt = 0; attempt < 12; attempt++) {
+// npm may accept a publication before registry processing completes.
+// Allow up to five minutes; never republish an accepted version on timeout.
+for (let attempt = 0; attempt < 60; attempt++) {
   const response = await fetch(`https://registry.npmjs.org/lokalchat/${pkg.version}`);
   if (response.ok) {
     const data = await response.json();
