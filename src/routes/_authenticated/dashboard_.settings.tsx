@@ -1,4 +1,4 @@
-import { createFileRoute, useBlocker } from "@tanstack/react-router";
+import { createFileRoute, Link, useBlocker } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Settings,
@@ -288,6 +288,36 @@ function AboutPanel() {
           </div>
         </dl>
       </SettingsBlock>
+      <section
+        className="lc-settings-support"
+        aria-labelledby="lokalchat-support-title"
+      >
+        <div>
+          <h2 id="lokalchat-support-title">Support LokalChat</h2>
+          <p>
+            {t(
+              "Bantu menyokong pembangunan LokalChat.",
+              "Help support the development of LokalChat.",
+            )}
+          </p>
+          <p
+            id="lokalchat-donate-status"
+            className="lc-settings-support-status"
+          >
+            {t(
+              "Lihat pilihan sumbangan untuk menyokong LokalChat.",
+              "Explore ways to support LokalChat.",
+            )}
+          </p>
+        </div>
+        <Link
+          to="/donate"
+          className="lc-settings-donate"
+          aria-describedby="lokalchat-donate-status"
+        >
+          Donate
+        </Link>
+      </section>
       <SettingsBlock title={t("Panduan & bantuan", "Guides & help")}>
         <a
           className="lc-settings-help-link"
