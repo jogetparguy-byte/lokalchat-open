@@ -67,5 +67,5 @@ jobs:
           sha256sum --check release/SHA256SUMS
           node scripts/check-release.mjs
           VERSION=$(node -p "require('./packages/create-lokalchat/package.json').version")
-          npm publish "release/lokalchat-$VERSION.tgz" --ignore-scripts --access public --tag latest --provenance
+          npm publish "./release/lokalchat-$VERSION.tgz" --ignore-scripts --access public --tag latest --provenance
           node scripts/verify-registry.mjs "release/lokalchat-$VERSION.tgz"
