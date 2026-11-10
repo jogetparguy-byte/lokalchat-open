@@ -125,21 +125,38 @@ async function checkStock(productName: string, businessId: string | null): Promi
 
 
   try {
-    const { assertPublicHttpUrl } = await import("./ssrf.server");
-    const url = await assertPublicHttpUrl(baseUrl);
+    const { fetchPublicHttp } = await import("./ssrf.server");
+    const url = new URL(baseUrl);
     url.searchParams.set("product", productName);
-    const res = await fetch(url.toString(), {
+    const res = await fetchPublicHttp(url.toString(), {
       headers: { Accept: "application/json" },
-      redirect: "error",
+      maxBytes: 64 * 1024,
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return `Gagal semak stok (status ${res.status}).`;
-    const contentLength = Number(res.headers.get("content-length") ?? 0);
-    if (contentLength > 64 * 1024) return "Respons inventori terlalu besar.";
-    const body = await res.text();
+
+    // Read response body with hard limit (64 KiB) without trusting Content-Length
+    const MAX_BODY = 64 * 1024;
+    let body = "";
+    if (res.body) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let total = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.length;
+        if (total > MAX_BODY) return "Respons inventori terlalu besar.";
+        body += decoder.decode(value, { stream: true });
+      }
+      body += decoder.decode();
+    } else {
+      body = await res.text();
+      if (body.length > MAX_BODY) return "Respons inventori terlalu besar.";
+    }
     return body.slice(0, 1500);
   } catch (error) {
-    console.error("check_stock failed", error);
+    console.error("check_stock failed", { message: error instanceof Error ? error.message : String(error) });
     return "Sistem inventori tidak dapat dihubungi buat masa ini.";
   }
 }
@@ -184,16 +201,14 @@ async function callGateway(messages: ChatMessage[], businessId: string | null) {
   if (!businessId) throw new Error("Pemilik perbualan tidak ditemui");
   const { baseUrl, model, apiKey } = await getActiveLlmConfig(businessId);
 
-  // Recheck user-selected endpoints at request time, including DNS changes.
+  const gatewayUrl = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
   const { LLM_PROVIDERS } = await import("./llm-settings");
-  if (!Object.values(LLM_PROVIDERS).some(provider => provider.baseUrl === baseUrl)) {
-    const { assertPublicHttpUrl } = await import("./ssrf.server");
-    await assertPublicHttpUrl(baseUrl);
-  }
-
-  const res = await fetch(`${baseUrl}/chat/completions`, {
+  const isCustom = !Object.values(LLM_PROVIDERS).some((provider) => provider.baseUrl === baseUrl);
+  const request = isCustom
+    ? (await import("./ssrf.server")).fetchPublicHttp
+    : (url: string, options: Parameters<typeof import("./ssrf.server").fetchPublicHttp>[1]) => fetch(url, { ...options, redirect: "error" });
+  const res = await request(gatewayUrl, {
     method: "POST",
-    redirect: "error",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
@@ -208,7 +223,10 @@ async function callGateway(messages: ChatMessage[], businessId: string | null) {
 
   if (res.status === 429) throw new Error("RATE_LIMIT");
   if (res.status === 402) throw new Error("NO_CREDITS");
-  if (!res.ok) throw new Error(`AI gateway error ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    throw new Error(`AI gateway error ${res.status}${errorText ? `: ${errorText.slice(0, 200)}` : ""}`);
+  }
 
   return (await res.json()) as {
     choices: Array<{ message: ChatMessage }>;
@@ -314,7 +332,7 @@ export async function runAgent(params: {
       }
     }
   } catch (error) {
-    console.error("Agent run failed", error);
+    console.error("Agent run failed", { message: error instanceof Error ? error.message : String(error) });
     reply = replyLanguage === "en"
       ? "The assistant is temporarily unavailable. I’m contacting the store owner for you."
       : "Maaf boss, sistem saya ada gangguan sekejap. Saya panggil pemilik kedai ya.";

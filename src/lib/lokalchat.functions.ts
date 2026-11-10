@@ -672,14 +672,17 @@ export const processKbDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
+    // Atomically claim document for processing: only pending -> processing
     const { data: doc, error: docError } = await context.supabase
       .from("kb_documents")
-      .select("id, file_name, file_type, storage_path")
+      .update({ status: "processing" })
       .eq("id", data.id)
       .eq("business_id", context.userId)
+      .eq("status", "pending")
+      .select("id, file_name, file_type, storage_path")
       .maybeSingle();
     if (docError) throw new Error(docError.message);
-    if (!doc) throw new Error("Dokumen tidak dijumpai");
+    if (!doc) throw new Error("Dokumen tidak dijumpai atau sedang diproses");
 
     const fail = async (message: string) => {
       await context.supabase

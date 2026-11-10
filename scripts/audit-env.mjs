@@ -27,9 +27,10 @@ for (const file of files) {
 const template = readFileSync('.env.example', 'utf8');
 const names = [...template.matchAll(/^\s*(?:#\s*)?([A-Z][A-Z0-9_]*)=/gm)].map(match => match[1]);
 const documented = new Set(names);
-// Production framework controls already documented in README, not direct app reads.
-const framework = new Set(['PORT', 'HOST']);
-for (const name of referenced) if (!documented.has(name)) errors.push(`Missing from template: ${name}`);
+// Framework controls are documented in README; GITHUB_REF is a CI-only control
+// documented in docs/RELEASING.md, not an application credential.
+const framework = new Set(['PORT', 'HOST', 'DEV', 'GITHUB_REF']);
+for (const name of referenced) if (!documented.has(name) && !framework.has(name)) errors.push(`Missing from template: ${name}`);
 for (const name of documented) if (!referenced.has(name) && !framework.has(name)) errors.push(`Unused template variable: ${name}`);
 for (const name of documented) if (names.filter(item => item === name).length > 1) errors.push(`Duplicate: ${name}`);
 const probes = ['.env', '.env.local', '.env.production', 'supabase/.env', 'supabase/.env.local', '.env.example', 'supabase/.env.example'];

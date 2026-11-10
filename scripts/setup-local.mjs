@@ -132,7 +132,7 @@ export async function setupLocal(options, {
     output('Local setup uses experimental Supabase stacks. No automatic retries.');
     attempted = true;
     const runtimeArgs = options.runtime === 'auto' ? [] : ['--runtime', options.runtime];
-    await run(cli, ['start', ...runtimeArgs, '--preparation', 'on-demand', '--exclude', 'realtime,functions,studio,mail,analytics,pooler']);
+    await run(cli, ['start', ...runtimeArgs, '--preparation', 'on-demand', '--eager', '--exclude', 'realtime,functions,studio,mail,analytics,pooler']);
     step = 'local migrations';
     output('[3/5] Applying and checking app migrations. Existing data is kept.');
     await run(cli, ['migration', 'up', '--yes']);

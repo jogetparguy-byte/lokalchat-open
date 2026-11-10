@@ -100,10 +100,10 @@ export async function sendWhatsAppMessage(
 
     if (!creds) {
       if (options?.allowDryRun) {
-        console.info(`[whatsapp:dry-run] -> ${to}: ${text}`);
+        console.info("[whatsapp:dry-run] message queued", { toLength: to.length, textLength: text.length });
         return { ok: true, dryRun: true };
       }
-      console.error(`[whatsapp] No usable credentials for business ${businessId ?? "unknown"}`);
+      console.error("[whatsapp] No usable credentials", { businessId: businessId ?? "unknown" });
       return { ok: false, error: DELIVERY_ERRORS.connection };
     }
 
@@ -144,8 +144,8 @@ export async function sendWhatsAppMessage(
     }
 
     return { ok: true, status: res.status };
-  } catch {
-    console.error("WhatsApp send failed before confirmation");
+  } catch (error) {
+    console.error("WhatsApp send failed before confirmation", { message: error instanceof Error ? error.message : String(error) });
     return { ok: false, error: DELIVERY_ERRORS.failed };
   }
 }

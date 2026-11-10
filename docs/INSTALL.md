@@ -3,7 +3,7 @@
 Perlukan Node.js 22.13+ atau versi 24 ke atas (Node 23 tidak disokong; Node 24 LTS disyorkan), npm atau pnpm. Aplikasi ini menggunakan server Node/Nitro; hosting statik sahaja tidak mencukupi.
 
 ```sh
-npx create-lokalchat@latest my-lokalchat
+npx lokalchat@latest my-lokalchat
 cd my-lokalchat
 ```
 

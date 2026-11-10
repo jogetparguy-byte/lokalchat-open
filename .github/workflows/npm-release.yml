@@ -1,0 +1,71 @@
+name: npm release
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: npm-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: node scripts/audit-env.mjs
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: node scripts/check-release.mjs
+      - name: Pack and test exact artifact
+        run: |
+          mkdir -p release
+          npm pack ./packages/create-lokalchat --pack-destination release
+          npm run test:package --prefix packages/create-lokalchat -- "$PWD/release/$(node -p "'lokalchat-' + require('./packages/create-lokalchat/package.json').version + '.tgz'")"
+          sha256sum release/*.tgz > release/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-release
+          path: release/
+          if-no-files-found: error
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'jogetparguy-byte/lokalchat-open'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - name: Ensure OIDC-capable npm
+        run: npm install --global npm@11.16.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-release
+          path: release
+      - name: Publish tested tarball
+        env:
+          NODE_AUTH_TOKEN: ''
+        run: |
+          sha256sum --check release/SHA256SUMS
+          node scripts/check-release.mjs
+          VERSION=$(node -p "require('./packages/create-lokalchat/package.json').version")
+          npm publish "release/lokalchat-$VERSION.tgz" --ignore-scripts --access public --tag latest --provenance
+          node scripts/verify-registry.mjs "release/lokalchat-$VERSION.tgz"
