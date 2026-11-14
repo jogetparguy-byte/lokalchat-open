@@ -1,5 +1,7 @@
 # LokalChat Open
 
+Aplikasi ini terus mengalihkan `/` kepada `/auth` untuk log masuk atau daftar. Landing page diselenggara sebagai projek berasingan `lokalchat-landing` dan tidak dibundel dalam npm installer.
+
 ## Install untuk developer
 
 ```sh

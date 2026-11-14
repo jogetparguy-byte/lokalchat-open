@@ -2,6 +2,8 @@
 
 Create a self-hosted LokalChat Open app.
 
+The installed application opens at `http://127.0.0.1:3000/auth` for registration or login. Its root URL redirects there. The public landing page is maintained as a separate project and is not bundled in this installer.
+
 Install the CLI in an existing project with `npm install lokalchat@latest`, then run `npx lokalchat`. Installing the package alone does not scaffold or start the application. Requires Node.js 22.13+ or >=24 (Node 23 is unsupported; Node 24 LTS recommended).
 
 ```sh

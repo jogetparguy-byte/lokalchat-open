@@ -62,6 +62,10 @@ try {
   if (process.platform !== 'win32') assert.equal((await stat(join(destination, '.env'))).mode & 0o777, 0o600);
   for (const name of ['.git', '.lokalchat', 'node_modules']) await assert.rejects(access(join(destination, name)), { code: 'ENOENT' });
   for (const name of ['.gitignore', 'package-lock.json', 'pnpm-lock.yaml', 'scripts/setup-local.mjs', 'supabase/migrations', 'src']) await access(join(destination, name));
+  for (const name of ['src/styles/landing.css', 'src/components/lokalchat/LandingDemo.tsx', 'public/images/lokalchat-ribbon-hero.webp']) {
+    await assert.rejects(access(join(destination, name)), { code: 'ENOENT' });
+  }
+  assert.match(await readFile(join(destination, 'src/routes/index.tsx'), 'utf8'), /throw redirect\(\{ to: "\/auth", replace: true \}\)/);
 
   const original = await readFile(join(destination, 'package.json'), 'utf8');
   assert.match((await npx(['--skip-install'], 1)).stderr, /new or empty directory/);

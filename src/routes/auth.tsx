@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,10 +92,7 @@ function AuthPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Kembali ke laman utama
-          </Link>
+        <div className="mb-5 flex items-center justify-end gap-3">
           <ThemeToggle />
         </div>
         <div className="surface-panel p-7">
