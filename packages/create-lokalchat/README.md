@@ -2,6 +2,10 @@
 
 Create a self-hosted LokalChat Open app.
 
+For login without Supabase setup, use `npx lokalchat@latest --start` after the new installer release is published. It starts the app directly; you can also scaffold normally and run `npm run dev`. LokalChat accounts and sessions are persisted privately in `.lokalchat/accounts.sqlite`. Keep this file on persistent storage and back it up. Supabase data integrations can be configured separately after login. `--setup-local` is an optional legacy database development workflow, not a login requirement.
+
+The installed application opens at `http://127.0.0.1:3000/auth` for registration or login. Its root URL redirects there. The public landing page is maintained as a separate project and is not bundled in this installer.
+
 Install the CLI in an existing project with `npm install lokalchat@latest`, then run `npx lokalchat`. Installing the package alone does not scaffold or start the application. Requires Node.js 22.13+ or >=24 (Node 23 is unsupported; Node 24 LTS recommended).
 
 ```sh
@@ -39,6 +43,6 @@ Use `pnpm run` instead of `npm run` if preferred. With pnpm, pass script flags d
 
 Maintainers: run `npm test` and `npm pack --dry-run` in this directory. `prepack` builds the bundled app template from an explicit source allowlist and runs CLI tests. Regenerate the template after changes to the application. Review the package contents before an authorized npm publication; preparing a package does not publish it.
 
-After packing, run `npm run test:package -- /absolute/path/lokalchat-0.2.0.tgz`. This runs the actual tarball through `npm exec` (the executor behind `npx`) using an isolated offline cache. It checks help/version, shell completions, default and named scaffolds, private placeholder configuration and refusal to overwrite existing files. It does not install app dependencies or start services. Publish the same reviewed tarball; see `docs/RELEASING.md`.
+After packing, run `npm run test:package -- /absolute/path/lokalchat-0.2.3.tgz` (use the version printed by `npm pack`). This runs the actual tarball through `npm exec` (the executor behind `npx`) using an isolated offline cache. It checks help/version, shell completions, default and named scaffolds, private placeholder configuration and refusal to overwrite existing files. It does not install app dependencies or start services. Publish the same reviewed tarball; see `docs/RELEASING.md`.
 
 The public `@latest` command is available only after npm publication. For local testing before release, see `docs/RELEASING.md` in the source repository.

@@ -14,7 +14,7 @@ import { createRunner } from './local/process.mjs';
 const appRoot = fileURLToPath(new URL('..', import.meta.url));
 export const HELP = `Usage: npm run setup:local -- [options]
 
-Prepare a separate development database and start LokalChat at http://127.0.0.1:3000.
+Prepare a separate development database and start LokalChat at http://127.0.0.1:3000/auth.
 Options:
   --runtime auto|native|docker|podman  Default: auto; reuse the saved runtime on later starts.
   --check                             Prepare and verify the database, then stop without starting the app.
@@ -107,7 +107,7 @@ export async function setupLocal(options, {
       if (options.check) output('PASS: saved configuration format. Connection, schema and credentials were not tested.');
       else {
         step = 'application start';
-        output('Open http://127.0.0.1:3000. Restart loads the saved Supabase settings.');
+        output('Open http://127.0.0.1:3000/auth. Restart loads the saved Supabase settings.');
         await run(process.execPath, ['scripts/dev.mjs'], { cwd: app, env: appEnv, visible: true, timeout: 0 });
       }
       return;
@@ -151,7 +151,7 @@ export async function setupLocal(options, {
     if (options.check) output('[5/5] PASS: local migrations, Auth, REST and app configuration. Database will stop; data is kept.');
     else {
       step = 'application start';
-      output('[5/5] Open http://127.0.0.1:3000 and register a test account.');
+      output('[5/5] Open http://127.0.0.1:3000/auth to register or log in.');
       output('Keep this terminal open. Ctrl+C stops this app and database; data is kept.');
       output('WhatsApp and AI require separate configuration.');
       await run(process.execPath, ['scripts/dev.mjs'], { cwd: app, env: appEnv, visible: true, timeout: 0 });

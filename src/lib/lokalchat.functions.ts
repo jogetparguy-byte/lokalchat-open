@@ -4,6 +4,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAccountAuth } from "./account-middleware";
 import { summarize, type MsgRow, type HandoffRow } from "./metrics";
 import { safeDeliveryError, DELIVERY_ERRORS } from "./delivery-error";
 
@@ -323,9 +324,10 @@ export const deleteFaq = createServerFn({ method: "POST" })
   });
 
 export const getProfile = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAccountAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    if (context.account) return (await import("./account-store.server")).accountProfile(context.userId);
+    const { data, error } = await context.supabase!
       .from("profiles")
       .select("id, business_name, inventory_api_url, owner_whatsapp")
       .eq("id", context.userId)
@@ -335,7 +337,7 @@ export const getProfile = createServerFn({ method: "GET" })
   });
 
 export const updateProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAccountAuth])
   .inputValidator((input: import("./profile-settings").ProfilePatch) => input)
   .handler(async ({ data, context }) => {
     const { validateProfilePatch } = await import("./profile-settings");
@@ -344,12 +346,16 @@ export const updateProfile = createServerFn({ method: "POST" })
       const { assertPublicHttpUrl } = await import("./ssrf.server");
       await assertPublicHttpUrl(patch.inventory_api_url);
     }
+    if (context.account) {
+      (await import("./account-store.server")).accountProfile(context.userId, patch);
+      return { ok: true };
+    }
     // Only change the submitted section. Saving one panel must not overwrite another.
-    const { data: rows, error } = await context.supabase.from("profiles")
+    const { data: rows, error } = await context.supabase!.from("profiles")
       .update(patch).eq("id", context.userId).select("id");
     if (error) throw new Error(error.message);
     if (!rows?.length) {
-      const { error: insertError } = await context.supabase.from("profiles")
+      const { error: insertError } = await context.supabase!.from("profiles")
         .insert({ id: context.userId, business_name: "Kedai Saya", ...patch });
       if (insertError) throw new Error(insertError.message);
     }
@@ -921,9 +927,10 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
 }
 
 export const getMyRole = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAccountAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    if (context.account) return { role: "sme" };
+    const { data, error } = await context.supabase!
       .from("profiles")
       .select("role")
       .eq("id", context.userId)
@@ -1061,14 +1068,14 @@ export const getPlatformApiKey = createServerFn({ method: "GET" })
 
 /** Each authenticated owner manages only their own credentials; no admin role is required. */
 export const getLlmSettings = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAccountAuth])
   .handler(async ({ context }) => {
     const { getLlmEnvSettings } = await import("./llm-env.server");
     return { canManage: true as const, ...await getLlmEnvSettings(context.userId) };
   });
 
 export const saveLlmSettings = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAccountAuth])
   .inputValidator(async (input: unknown) => {
     const { validateLlmSettings } = await import("./llm-settings");
     return validateLlmSettings(input);
@@ -1085,14 +1092,14 @@ export const saveLlmSettings = createServerFn({ method: "POST" })
 
 /** Supabase credentials are private to the verified account. */
 export const getSupabaseSettings = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAccountAuth])
   .handler(async ({ context }) => {
     const { getSupabaseEnvSettings } = await import("./supabase-env.server");
     return { canManage: true as const, ...await getSupabaseEnvSettings(context.userId) };
   });
 
 export const saveSupabaseSettings = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAccountAuth])
   .inputValidator(async (input: unknown) => {
     const { validateSupabaseSettings } = await import("./supabase-settings");
     return validateSupabaseSettings(input);

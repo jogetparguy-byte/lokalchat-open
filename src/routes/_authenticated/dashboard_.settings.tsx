@@ -231,8 +231,8 @@ export function SettingsPage() {
                       <>
                         <p className="lc-settings-note">
                           {t(
-                            "Konfigurasi ini dikongsi semua akaun pada pemasangan sama. Semua pengguna login boleh menyimpannya.",
-                            "These settings are shared by all accounts on this installation. Any signed-in user can save them.",
+                            "Konfigurasi AI dan sambungan MCP Supabase disimpan berasingan untuk akaun anda.",
+                            "AI settings and the Supabase MCP connection are stored separately for your account.",
                           )}
                         </p>
                         <LlmSettingsSection />

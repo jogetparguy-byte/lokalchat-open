@@ -2,6 +2,7 @@ import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertTemplateSafe } from '../bin/create-lokalchat.mjs';
+import { isTemplatePathAllowed } from './template-filter.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -16,10 +17,7 @@ await mkdir(template, { recursive: true });
 for (const item of allowed) {
   await cp(join(root, item), join(template, item), {
     recursive: true,
-    filter: source => {
-      const parts = relative(root, source).split('/');
-      return !parts.some(part => ['node_modules', '.git', '.lokalchat', '.supabase', '.temp', '.branches', '.output', 'dist'].includes(part) || (part.startsWith('.env') && part !== '.env.example') || part.endsWith('.log'));
-    },
+    filter: source => isTemplatePathAllowed(relative(root, source)),
   });
 }
 await cp(join(root, '.gitignore'), join(template, 'gitignore'));

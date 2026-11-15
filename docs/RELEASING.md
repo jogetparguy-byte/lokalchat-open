@@ -8,8 +8,8 @@ Pakej CLI berada dalam `packages/create-lokalchat`. Ia membundel snapshot aplika
 npm test --prefix packages/create-lokalchat
 npm pack ./packages/create-lokalchat --pack-destination /tmp
 # Gunakan nama tarball sebenar yang dipaparkan oleh npm pack:
-npm run test:package --prefix packages/create-lokalchat -- /tmp/lokalchat-0.2.0.tgz
-npx --yes --package /tmp/lokalchat-0.2.0.tgz lokalchat /tmp/lokalchat-smoke --skip-install
+npm run test:package --prefix packages/create-lokalchat -- /tmp/lokalchat-0.2.3.tgz
+npx --yes --package /tmp/lokalchat-0.2.3.tgz lokalchat /tmp/lokalchat-smoke --skip-install
 cd /tmp/lokalchat-smoke
 npm install --include=dev
 npm test
@@ -43,9 +43,9 @@ npm login --registry=https://registry.npmjs.org/
 Dapatkan izin penerbitan sebelum arahan publish. Terbitkan **tarball sama yang telah disemak**, bukannya folder sumber yang boleh berubah selepas audit. Semakan dry-run tidak menerbitkan pakej dan tidak membuktikan hak akaun untuk menerbitkan.
 
 ```sh
-npm publish /tmp/lokalchat-0.2.0.tgz --dry-run --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
+npm publish /tmp/lokalchat-0.2.3.tgz --dry-run --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
 # Hanya selepas mendapat izin penerbitan:
-npm publish /tmp/lokalchat-0.2.0.tgz --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
+npm publish /tmp/lokalchat-0.2.3.tgz --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org/
 ```
 
 Flag `--ignore-scripts` mengelakkan lifecycle scripts dijalankan semula semasa menerbitkan snapshot yang telah dipack dan diuji. `--tag latest` menjadikan versi ini sasaran `@latest`. Jangan pack semula atau ubah tarball selepas semakan; perubahan memerlukan pack dan semakan baharu.
@@ -76,10 +76,11 @@ Persediaan pemilik sekali sahaja:
    owner `jogetparguy-byte`, repo `lokalchat-open`, workflow `npm-release.yml`, environment `npm`.
    Benarkan direct publish (`npm publish`). Tiada token npm jangka panjang diperlukan.
 3. Merge branch integrasi selepas CI lulus. Semak commit dan versi installer sebelum
-   mencipta tag `v0.2.1` pada commit yang telah disemak dan push tag itu.
+   mencipta tag `v0.2.3` pada commit yang telah disemak dan push tag itu.
 4. Tunggu workflow; semak integrity/latest dan jalankan pemasangan sebenar daripada registry.
 
-Versi 0.2.1 ialah calon seterusnya, bukan bukti sudah diterbitkan. Source asal 0.2.0
+Versi 0.2.3 ialah calon pembaikan lokal, bukan bukti sudah diterbitkan.
+Registry telah disemak pada 14 November 2026: `latest` ialah 0.2.2 dan versi itu tidak boleh diterbitkan semula. Source asal 0.2.0
 ialah snapshot lokal; commit GitHub baharu tidak boleh dianggap sama dengan tarball lama.
 Scaffold sedia ada tidak dikemas kini secara automatik. Migration baharu mesti turut
 diaplikasikan bagi aplikasi pengguna sedia ada. Ujian CI ini tidak menjalankan Docker,

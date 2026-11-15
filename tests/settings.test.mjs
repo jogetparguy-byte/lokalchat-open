@@ -193,6 +193,7 @@ test("profile server saves only submitted fields, checks tenant and rejects priv
   const api = load("../src/lib/lokalchat.functions.ts", {
     "@tanstack/react-start": { createServerFn },
     "@/integrations/supabase/auth-middleware": { requireSupabaseAuth: {} },
+    "./account-middleware": { requireAccountAuth: {} },
     "./metrics": {},
     "./delivery-error": {},
     "./profile-settings": { validateProfilePatch },

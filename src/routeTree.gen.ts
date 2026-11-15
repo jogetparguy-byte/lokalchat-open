@@ -14,12 +14,14 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DonateRouteImport } from './routes/donate'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as ApiAccountRouteImport } from './routes/api/account'
 import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
 import { Route as AuthenticatedDashboardInboxRouteImport } from './routes/_authenticated/dashboard_.inbox'
 import { Route as AuthenticatedDashboardKnowledgeBaseRouteImport } from './routes/_authenticated/dashboard_.knowledge-base'
 import { Route as AuthenticatedDashboardSettingsRouteImport } from './routes/_authenticated/dashboard_.settings'
 import { Route as AuthenticatedDashboardUnansweredRouteImport } from './routes/_authenticated/dashboard_.unanswered'
 import { Route as ApiPublicWhatsappRouteImport } from './routes/api/public/whatsapp'
+import { Route as ApiSupabaseMcpRouteImport } from './routes/api/supabase/mcp'
 import { Route as ApiPublicHooksWeeklyReportRouteImport } from './routes/api/public/hooks/weekly-report'
 
 const IndexRoute = IndexRouteImport.update({
@@ -45,6 +47,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiAccountRoute = ApiAccountRouteImport.update({
+  id: '/api/account',
+  path: '/api/account',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminAnalyticsRoute =
   AuthenticatedAdminAnalyticsRouteImport.update({
@@ -81,6 +88,11 @@ const ApiPublicWhatsappRoute = ApiPublicWhatsappRouteImport.update({
   path: '/api/public/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSupabaseMcpRoute = ApiSupabaseMcpRouteImport.update({
+  id: '/api/supabase/mcp',
+  path: '/api/supabase/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksWeeklyReportRoute =
   ApiPublicHooksWeeklyReportRouteImport.update({
     id: '/api/public/hooks/weekly-report',
@@ -93,12 +105,14 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/donate': typeof DonateRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/account': typeof ApiAccountRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/dashboard/inbox': typeof AuthenticatedDashboardInboxRoute
   '/dashboard/knowledge-base': typeof AuthenticatedDashboardKnowledgeBaseRoute
   '/dashboard/settings': typeof AuthenticatedDashboardSettingsRoute
   '/dashboard/unanswered': typeof AuthenticatedDashboardUnansweredRoute
   '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
+  '/api/supabase/mcp': typeof ApiSupabaseMcpRoute
   '/api/public/hooks/weekly-report': typeof ApiPublicHooksWeeklyReportRoute
 }
 export interface FileRoutesByTo {
@@ -106,12 +120,14 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/donate': typeof DonateRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/account': typeof ApiAccountRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/dashboard/inbox': typeof AuthenticatedDashboardInboxRoute
   '/dashboard/knowledge-base': typeof AuthenticatedDashboardKnowledgeBaseRoute
   '/dashboard/settings': typeof AuthenticatedDashboardSettingsRoute
   '/dashboard/unanswered': typeof AuthenticatedDashboardUnansweredRoute
   '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
+  '/api/supabase/mcp': typeof ApiSupabaseMcpRoute
   '/api/public/hooks/weekly-report': typeof ApiPublicHooksWeeklyReportRoute
 }
 export interface FileRoutesById {
@@ -121,12 +137,14 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/donate': typeof DonateRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/account': typeof ApiAccountRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/_authenticated/dashboard_/inbox': typeof AuthenticatedDashboardInboxRoute
   '/_authenticated/dashboard_/knowledge-base': typeof AuthenticatedDashboardKnowledgeBaseRoute
   '/_authenticated/dashboard_/settings': typeof AuthenticatedDashboardSettingsRoute
   '/_authenticated/dashboard_/unanswered': typeof AuthenticatedDashboardUnansweredRoute
   '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
+  '/api/supabase/mcp': typeof ApiSupabaseMcpRoute
   '/api/public/hooks/weekly-report': typeof ApiPublicHooksWeeklyReportRoute
 }
 export interface FileRouteTypes {
@@ -136,12 +154,14 @@ export interface FileRouteTypes {
     | '/auth'
     | '/donate'
     | '/dashboard'
+    | '/api/account'
     | '/admin/analytics'
     | '/dashboard/inbox'
     | '/dashboard/knowledge-base'
     | '/dashboard/settings'
     | '/dashboard/unanswered'
     | '/api/public/whatsapp'
+    | '/api/supabase/mcp'
     | '/api/public/hooks/weekly-report'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -149,12 +169,14 @@ export interface FileRouteTypes {
     | '/auth'
     | '/donate'
     | '/dashboard'
+    | '/api/account'
     | '/admin/analytics'
     | '/dashboard/inbox'
     | '/dashboard/knowledge-base'
     | '/dashboard/settings'
     | '/dashboard/unanswered'
     | '/api/public/whatsapp'
+    | '/api/supabase/mcp'
     | '/api/public/hooks/weekly-report'
   id:
     | '__root__'
@@ -163,12 +185,14 @@ export interface FileRouteTypes {
     | '/auth'
     | '/donate'
     | '/_authenticated/dashboard'
+    | '/api/account'
     | '/_authenticated/admin/analytics'
     | '/_authenticated/dashboard_/inbox'
     | '/_authenticated/dashboard_/knowledge-base'
     | '/_authenticated/dashboard_/settings'
     | '/_authenticated/dashboard_/unanswered'
     | '/api/public/whatsapp'
+    | '/api/supabase/mcp'
     | '/api/public/hooks/weekly-report'
   fileRoutesById: FileRoutesById
 }
@@ -177,7 +201,9 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   DonateRoute: typeof DonateRoute
+  ApiAccountRoute: typeof ApiAccountRoute
   ApiPublicWhatsappRoute: typeof ApiPublicWhatsappRoute
+  ApiSupabaseMcpRoute: typeof ApiSupabaseMcpRoute
   ApiPublicHooksWeeklyReportRoute: typeof ApiPublicHooksWeeklyReportRoute
 }
 
@@ -217,6 +243,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/account': {
+      id: '/api/account'
+      path: '/api/account'
+      fullPath: '/api/account'
+      preLoaderRoute: typeof ApiAccountRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/analytics': {
       id: '/_authenticated/admin/analytics'
@@ -260,6 +293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/supabase/mcp': {
+      id: '/api/supabase/mcp'
+      path: '/api/supabase/mcp'
+      fullPath: '/api/supabase/mcp'
+      preLoaderRoute: typeof ApiSupabaseMcpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/weekly-report': {
       id: '/api/public/hooks/weekly-report'
       path: '/api/public/hooks/weekly-report'
@@ -297,7 +337,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   DonateRoute: DonateRoute,
+  ApiAccountRoute: ApiAccountRoute,
   ApiPublicWhatsappRoute: ApiPublicWhatsappRoute,
+  ApiSupabaseMcpRoute: ApiSupabaseMcpRoute,
   ApiPublicHooksWeeklyReportRoute: ApiPublicHooksWeeklyReportRoute,
 }
 export const routeTree = rootRouteImport

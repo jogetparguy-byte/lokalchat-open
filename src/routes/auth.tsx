@@ -1,12 +1,11 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { accountAuth } from "@/lib/account-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { hasPublicConfig } from "@/lib/public-config";
 import { BrandLogo } from "@/components/lokalchat/BrandLogo";
 import { ThemeToggle } from "@/components/lokalchat/ThemeToggle";
 
@@ -38,21 +37,18 @@ function AuthPage() {
   const [ready, setReady] = useState(false);
   useEffect(() => { setReady(true); }, []);
 
-  const configured = hasPublicConfig(import.meta.env["VITE_SUPABASE_URL"], import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]);
-
   useEffect(() => {
-    if (!configured) return;
-    supabase.auth.getSession().then(({ data }) => {
+    accountAuth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/dashboard" });
     });
-  }, [navigate, configured]);
+  }, [navigate]);
 
   const handleSignIn = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!configured || loading) return;
+    if (loading) return;
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await accountAuth.signInWithPassword({ email, password });
       if (error) throw error;
       await navigate({ to: "/dashboard" });
     } catch (error) {
@@ -64,10 +60,10 @@ function AuthPage() {
 
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!configured || loading) return;
+    if (loading) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await accountAuth.signUp({
         email,
         password,
         options: {
@@ -92,10 +88,7 @@ function AuthPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Kembali ke laman utama
-          </Link>
+        <div className="mb-5 flex items-center justify-end gap-3">
           <ThemeToggle />
         </div>
         <div className="surface-panel p-7">
@@ -106,7 +99,7 @@ function AuthPage() {
             Log masuk untuk urus perbualan WhatsApp kedai anda.
           </p>
 
-          {!configured && <p role="alert" className="mt-4 text-sm text-destructive">Sambungan belum dikonfigurasi. Tetapkan VITE_SUPABASE_URL dan VITE_SUPABASE_PUBLISHABLE_KEY dalam .env dahulu.</p>}
+          <p className="mt-3 text-center text-xs text-muted-foreground">Akaun LokalChat tidak memerlukan konfigurasi Supabase.</p>
           <Tabs defaultValue="signin" className="mt-6">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Log Masuk</TabsTrigger>
@@ -135,7 +128,7 @@ function AuthPage() {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading || !configured || !ready}>
+                <Button type="submit" className="w-full" disabled={loading || !ready}>
                   Log Masuk
                 </Button>
               </form>
@@ -168,12 +161,12 @@ function AuthPage() {
                     id="signup-password"
                     type="password"
                     required
-                    minLength={6}
+                    minLength={8}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading || !configured || !ready}>
+                <Button type="submit" className="w-full" disabled={loading || !ready}>
                   Daftar Akaun
                 </Button>
               </form>

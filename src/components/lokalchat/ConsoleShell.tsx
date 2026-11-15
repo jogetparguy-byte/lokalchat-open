@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useApi } from "@/services/api";
 import { getMyRole } from "@/services/api";
 import { useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { accountAuth } from "@/lib/account-auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -27,8 +27,8 @@ function AccountCard() {
       setInfo({ name, email, avatar });
       setImgFailed(false);
     };
-    void supabase.auth.getUser().then(({ data }) => updateUser(data.user)).catch(() => {});
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => updateUser(session?.user ?? null));
+    void accountAuth.getUser().then(({ data }) => updateUser(data.user)).catch(() => {});
+    const { data } = accountAuth.onAuthStateChange((_event, session) => updateUser(session?.user ?? null));
     return () => {
       alive = false;
       data.subscription.unsubscribe();
@@ -180,7 +180,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 
         <div className="lc-sidebar-foot">
           <button type="button" onClick={async () => {
-            const { error } = await supabase.auth.signOut({ scope: "local" });
+            const { error } = await accountAuth.signOut({ scope: "local" });
             if (error) { toast.error(error.message); return; }
             queryClient.clear();
             await navigate({ to: "/auth" });

@@ -1,14 +1,24 @@
 # LokalChat Open
 
+Aplikasi ini terus mengalihkan `/` kepada `/auth` untuk log masuk atau daftar. Landing page diselenggara sebagai projek berasingan `lokalchat-landing` dan tidak dibundel dalam npm installer.
+
 ## Install untuk developer
 
 ```sh
 npx lokalchat@latest my-lokalchat
 cd my-lokalchat
-npm run setup:local
+npm run dev
 ```
 
-CLI disediakan dalam `packages/create-lokalchat`; arahan registry `@latest` memerlukan penerbitan npm oleh maintainer terlebih dahulu. Ia belum diterbitkan oleh audit ini. Ikuti [panduan pemasangan baharu](docs/INSTALL.md) untuk Supabase lokal/hosted, semua migration, `.env`, dependencies dan pembaikan `vite: command not found`. Maintainer boleh menguji tarball sebelum publish melalui [panduan pelepasan](docs/RELEASING.md).
+CLI disediakan dalam `packages/create-lokalchat`. Pilihan `--start` memasang dependencies dan menjalankan app terus ke `/auth`, tanpa Supabase lokal. Perubahan ini memerlukan release npm baharu sebelum tersedia melalui `@latest`. Maintainer boleh menguji tarball sebelum publish melalui [panduan pelepasan](docs/RELEASING.md).
+
+## Akaun tanpa Supabase
+
+Daftar dan login tidak memerlukan `.env`, projek Supabase atau database Supabase lokal. Akaun disimpan oleh aplikasi dalam `.lokalchat/accounts.sqlite`; kata laluan dihash dengan scrypt dan sesi disahkan pada server melalui cookie HttpOnly. Simpan folder `.lokalchat/` secara peribadi dan buat backup. Untuk hosting, gunakan volume persisten; `LOKALCHAT_ACCOUNT_DB` boleh memilih lokasi fail akaun. Gunakan fail yang dikongsi oleh proses pada hos sama, bukan storan sementara setiap instance.
+
+Selepas login, Settings membolehkan pengguna menyimpan profil sambungan Supabase dan konfigurasi AI masing-masing. Profil sambungan yang disimpan belum mengaktifkan sambungan runtime data atau memigrasi data. Akaun aplikasi baharu memasuki halaman konfigurasi; ciri perbualan/data memerlukan integrasi data berasingan. Akaun Supabase sedia ada pada pemasangan yang dikonfigurasi masih boleh menggunakan login lama. Akaun LokalChat bukan akaun Supabase dan tidak memberikan akses automatik kepada data projek lain.
+
+### Setup database pembangunan lama (pilihan sahaja)
 
 `npm run setup:local` menyediakan database pembangunan berasingan, menyemak migration/Auth/REST dan membuka app di `http://127.0.0.1:3000`. Muat turun pertama memerlukan internet dan boleh mengambil beberapa minit. Biarkan terminal terbuka; Ctrl+C menghentikan app dan database ini tanpa memadam data. Jalankan arahan sama untuk menyambung. Pilihan `--setup-local` pada installer menjalankan setup terus selepas dependencies siap.
 
@@ -25,12 +35,10 @@ Gunakan Node.js 24 (versi ujian: 24.22.1) dan pnpm. Lockfile disertakan.
 
 ```bash
 pnpm install --frozen-lockfile
-cp .env.example .env
-# Isi konfigurasi projek staging dalam .env.
 pnpm dev
 ```
 
-Buka `http://127.0.0.1:3000`. Script dev memuatkan `.env` untuk pemboleh ubah server; Vite memuatkan `VITE_*` untuk browser. Tanpa konfigurasi, halaman login menyatakan sambungan belum tersedia dan menyekat penghantaran borang.
+Buka `http://127.0.0.1:3000/auth`. Script dev boleh memuatkan `.env` untuk integrasi data jika diperlukan; login akaun LokalChat tidak memerlukannya.
 
 Untuk production build lokal:
 

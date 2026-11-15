@@ -1,6 +1,6 @@
 {
   "name": "lokalchat",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Create LokalChat Open with a guided local database and app launcher",
   "type": "module",
   "bin": {

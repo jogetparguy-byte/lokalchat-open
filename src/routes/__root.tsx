@@ -13,7 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/lokalchat/ThemeProvider";
 import { themeBootstrapScript } from "@/lib/theme";
-import { supabase } from "@/integrations/supabase/client";
+import { accountAuth } from "@/lib/account-auth";
 import appCss from "@/styles.css?url";
 
 function NotFoundComponent() {
@@ -106,8 +106,7 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!import.meta.env["VITE_SUPABASE_URL"] || !import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]) return;
-    const { data } = supabase.auth.onAuthStateChange((event) => {
+    const { data } = accountAuth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") {
         return;
       }

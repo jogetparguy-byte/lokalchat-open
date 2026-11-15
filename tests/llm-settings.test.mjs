@@ -150,7 +150,9 @@ function handlers(role, options = {}) {
   let reads = 0, writes = 0;
   const context = { userId: 'verified-account', supabase: { from() { if (options.forbidProfileRead) assert.fail('LLM settings must not query admin roles'); return { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: role ? { role } : null, error: options.dbError ? { message: 'db-fixture' } : null }; } }; } } };
   // Exercise the real auth boundary with a stubbed Auth service, not a profile role.
-  const { requireSupabaseAuth } = loadModule('../src/integrations/supabase/auth-middleware.ts', {
+  const { requireAccountAuth: requireSupabaseAuth } = loadModule('../src/lib/account-middleware.ts', {
+    './account-http.server': { accountToken: () => undefined },
+    './account-store.server': { readAccount: () => null },
     '@tanstack/react-start': { createMiddleware: () => ({ server: fn => fn }) },
     '@tanstack/react-start/server': { getRequest: () => ({ headers: new Headers(options.noLogin ? {} : { authorization: 'Bearer fixture.jwt.token' }) }) },
     '@supabase/supabase-js': { createClient: () => ({ auth: { getClaims: async () => options.invalidToken
@@ -163,6 +165,7 @@ function handlers(role, options = {}) {
       return { middleware(items) { assert.equal(items.length, 1); assert.equal(items[0], requireSupabaseAuth); return this; }, inputValidator(fn) { validator = fn; return this; }, handler(fn) { return async (input = {}) => requireSupabaseAuth({ next: async () => fn({ context, data: await validator(input.data) }) }); } };
     } },
     '@/integrations/supabase/auth-middleware': { requireSupabaseAuth }, './metrics': {}, './delivery-error': {},
+    './account-middleware': { requireAccountAuth: requireSupabaseAuth },
     './llm-settings': { validateLlmSettings },
     './ssrf.server': { assertPublicHttpUrl: async () => { if (options.blocked) throw new Error('private endpoint'); } },
     './llm-env.server': {

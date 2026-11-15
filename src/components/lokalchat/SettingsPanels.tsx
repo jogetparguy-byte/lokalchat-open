@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { accountAuth } from "@/lib/account-auth";
 import { getProfile, updateProfile, useApi } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,7 @@ export function useSettingsUser() {
   return useQuery({
     queryKey: ["settings-user"],
     queryFn: async () => {
-      const { data, error } = await supabase.auth.getUser();
+      const { data, error } = await accountAuth.getUser();
       if (error) throw error;
       if (!data.user)
         throw new Error("Sila login semula / Please sign in again");
@@ -436,7 +436,7 @@ function AccountPreferenceForm({
         setError("");
         setSaved(false);
         try {
-          const { data, error } = await supabase.auth.updateUser({
+          const { data, error } = await accountAuth.updateUser({
             data:
               kind === "reply"
                 ? { lokalchat_reply_language: reply }
@@ -566,7 +566,7 @@ function AccountName({ initial }: { initial: string }) {
         setError("");
         setSaved(false);
         try {
-          const { data, error } = await supabase.auth.updateUser({
+          const { data, error } = await accountAuth.updateUser({
             data: { full_name: name.trim() },
           });
           if (error) throw error;
@@ -637,7 +637,7 @@ function PasswordForm() {
         }
         setPending(true);
         try {
-          const { error } = await supabase.auth.updateUser({
+          const { error } = await accountAuth.updateUser({
             password,
             ...(current ? { current_password: current } : {}),
             ...(nonce ? { nonce } : {}),
@@ -711,7 +711,7 @@ function PasswordForm() {
               setPending(true);
               setError("");
               try {
-                const { error } = await supabase.auth.reauthenticate();
+                const { error } = await accountAuth.reauthenticate();
                 if (error) throw error;
                 setCodeSent(true);
               } catch (cause) {
@@ -774,7 +774,7 @@ function SessionActions() {
     setError("");
     setSaved(false);
     try {
-      const { error } = await supabase.auth.signOut({ scope });
+      const { error } = await accountAuth.signOut({ scope });
       if (error) throw error;
       if (scope === "global") {
         client.clear();

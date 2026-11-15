@@ -15,15 +15,18 @@ export function parseArgs(args) {
     if (arg === '--version' || arg === '-v') return { version: true };
     if (arg === '--completions') { const shell = args[++i]; completions(shell); return { completions: shell }; }
     if (arg === '--skip-install') options.install = false;
+    else if (arg === '--start') options.start = true;
     else if (arg === '--setup-local') options.setupLocal = true;
     else if (arg === '--package-manager') options.packageManager = args[++i];
-    else if (arg.startsWith('--package-manager=')) options.packageManager = arg.split('=')[1];
+    else if (arg.startsWith('--package-manager=')) options.packageManager = arg.slice('--package-manager='.length);
     else if (arg.startsWith('-')) throw new Error(`Unknown option: ${arg}`);
     else if (directorySet) throw new Error('Specify only one destination directory.');
     else { options.directory = arg; directorySet = true; }
   }
   if (!['npm', 'pnpm'].includes(options.packageManager)) throw new Error('--package-manager must be npm or pnpm.');
   if (options.setupLocal && !options.install) throw new Error('--setup-local requires dependency installation. Remove --skip-install, or run setup:local later.');
+  if (options.start && !options.install) throw new Error('--start requires dependency installation. Remove --skip-install, or run npm run dev later.');
+  if (options.start && options.setupLocal) throw new Error('Choose --start or --setup-local, not both. Login does not require a local Supabase database.');
   return options;
 }
 
@@ -118,7 +121,17 @@ export async function createProject(options, { cwd = process.cwd(), template = j
     }
     if (result.error || result.status !== 0) throw new Error(`Project created at ${destination}, but dependency installation failed. Run ${pm} ${args.join(' ')} there before starting the app.`);
   }
-  log(`\nCreated LokalChat at ${destination}\n\nNext steps:\n  cd ${JSON.stringify(destination)}\n${options.install ? '' : `  ${pm} install${pm === 'npm' ? ' --include=dev' : ' --frozen-lockfile --prod=false'}\n`}  ${pm} run setup:local\n\nLocal setup downloads Supabase CLI, creates a separate development database, applies migrations and starts the app.\nFirst start needs internet and can take several minutes. Ctrl+C stops it and keeps data.\nFor a hosted project, follow docs/INSTALL.md instead.\nNo database was contacted during scaffolding. No Git repository was initialized.\n`);
+  log(`\nCreated LokalChat at ${destination}\n\nNext steps:\n  cd ${JSON.stringify(destination)}\n${options.install ? '' : `  ${pm} install${pm === 'npm' ? ' --include=dev' : ' --frozen-lockfile --prod=false'}\n`}  ${pm} run dev\n\nOpen http://127.0.0.1:3000/auth to register or log in. Supabase configuration is optional for login.\nKeep account storage in .lokalchat/accounts.sqlite private and backed up. Configure data integrations in Settings later.\nNo database was contacted during scaffolding. No Git repository was initialized.\n`);
+  if (options.start) {
+    log('Starting LokalChat. Supabase local setup is not required. Keep this terminal open.');
+    const result = await run(process.execPath, ['scripts/dev.mjs'], { cwd: destination, stdio: 'inherit', shell: false, env: process.env });
+    if (result.interrupted) {
+      const error = new Error(`LokalChat stopped. Project and accounts kept. Resume with ${pm} run dev in ${destination}.`);
+      error.exitCode = 130;
+      throw error;
+    }
+    if (result.error || result.status !== 0) throw new Error(`LokalChat could not start. Project kept at ${destination}. Run ${pm} run dev there to inspect the error.`);
+  }
   if (options.setupLocal) {
     log('Starting automatic local development setup. Keep this terminal open.');
     const result = await run(process.execPath, ['scripts/setup-local.mjs'], { cwd: destination, stdio: 'inherit', shell: false, env: process.env });
@@ -134,7 +147,7 @@ export async function createProject(options, { cwd = process.cwd(), template = j
 
 export async function main(args = process.argv.slice(2)) {
   const options = parseArgs(args);
-  if (options.help) { console.log('Usage: create-lokalchat [directory] [--package-manager npm|pnpm] [--skip-install] [--setup-local]\nDefault directory: lokalchat-app. Node 22.13+ or >=24 required. Node 23 is unsupported.\n--setup-local: after installing dependencies, prepare a separate local database and start the app. First start needs internet.\n--completions bash|zsh|fish: print shell completion definitions.\nDefault: scaffold only; run npm run setup:local in the new folder when ready. Hosted setup: see docs/INSTALL.md.'); return; }
+  if (options.help) { console.log('Usage: create-lokalchat [directory] [--package-manager npm|pnpm] [--skip-install] [--start | --setup-local]\nDefault directory: lokalchat-app. Node 22.13+ or >=24 required. Node 23 is unsupported.\n--start: install dependencies and start the app. Login needs no Supabase configuration.\n--setup-local: optional legacy development database setup; not needed for login.\n--completions bash|zsh|fish: print shell completion definitions.\nDefault: scaffold only; run npm run dev in the new folder when ready. Data integrations: see docs/INSTALL.md.'); return; }
   if (options.version) { console.log(JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')).version); return; }
   if (options.completions) { console.log(completions(options.completions)); return; }
   const [major, minor] = process.versions.node.split('.').map(Number);

@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { hasPublicConfig } from "@/lib/public-config";
-import { supabase } from "@/integrations/supabase/client";
+import { accountAuth } from "@/lib/account-auth";
+import { useRouterState } from "@tanstack/react-router";
+import { AccountSetup } from "@/components/lokalchat/AccountSetup";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   const [verified, setVerified] = useState<string | null>(null);
+  const [localAccount, setLocalAccount] = useState(false);
   const navigate = useNavigate();
   useEffect(() => {
     let active = true;
@@ -18,23 +20,22 @@ function AuthenticatedLayout() {
       setVerified(null);
       void navigate({ to: "/auth", replace: true });
     };
-    if (!hasPublicConfig(import.meta.env["VITE_SUPABASE_URL"], import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"])) {
-      leave();
-      return;
-    }
     // Redirect after hydration. A redirect from beforeLoad during hydration can
     // invalidate the server's match tree before React finishes mounting it.
     let verification = 0;
     const verify = () => {
       const current = ++verification;
-      void supabase.auth.getUser().then(({ data, error }) => {
+      void accountAuth.getUser().then(({ data, error }) => {
         if (!active || current !== verification) return;
         if (error || !data.user) leave();
-        else setVerified(data.user.id);
+        else {
+          setLocalAccount(data.user.app_metadata["provider"] === "lokalchat");
+          setVerified(data.user.id);
+        }
       }).catch(() => { if (active && current === verification) leave(); });
     };
     verify();
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data } = accountAuth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
         verification++;
         leave();
@@ -47,12 +48,13 @@ function AuthenticatedLayout() {
     return () => { active = false; data.subscription.unsubscribe(); };
   }, [navigate]);
   // Server authorization is enforced separately on every server function.
-  return verified ? <AccountQueries key={verified} /> : <p role="status" className="p-8 text-sm">Menyemak sesi…</p>;
+  return verified ? <AccountQueries key={verified} localAccount={localAccount} /> : <p role="status" className="p-8 text-sm">Menyemak sesi…</p>;
 }
 
-function AccountQueries() {
+function AccountQueries({ localAccount }: { localAccount: boolean }) {
+  const pathname = useRouterState({ select: state => state.location.pathname });
   // Remounting by verified account also isolates late query and mutation results.
   const [client] = useState(() => new QueryClient());
   useEffect(() => () => { client.clear(); }, [client]);
-  return <QueryClientProvider client={client}><Outlet /></QueryClientProvider>;
+  return <QueryClientProvider client={client}>{localAccount && pathname !== "/dashboard/settings" ? <AccountSetup /> : <Outlet />}</QueryClientProvider>;
 }

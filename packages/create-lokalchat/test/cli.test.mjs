@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createProject, parseArgs, installCommand } from '../bin/create-lokalchat.mjs';
 import { completions } from '../bin/completions.mjs';
+import { isTemplatePathAllowed } from '../scripts/template-filter.mjs';
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'create-lokalchat-test-'));
@@ -21,7 +22,18 @@ async function fixture(t) {
 
 test('arguments reject unknown options, extra directories and arbitrary executable names', () => {
   assert.deepEqual(parseArgs(['my-app', '--skip-install', '--package-manager=pnpm']), { directory: 'my-app', packageManager: 'pnpm', install: false });
-  for (const args of [['--force'], ['a', 'b'], ['--package-manager', 'sh'], ['--package-manager']]) assert.throws(() => parseArgs(args));
+  for (const args of [['--force'], ['a', 'b'], ['--package-manager', 'sh'], ['--package-manager'], ['--package-manager=npm=invalid'], ['--package-manager=pnpm=invalid']]) assert.throws(() => parseArgs(args));
+});
+
+test('template filtering excludes private files and build state on POSIX and Windows paths', () => {
+  for (const separator of ['/', '\\']) {
+    for (const path of ['scripts/.env', 'scripts/.env.private', 'public/nested/.env.local', 'scripts/setup.log', 'src/.lokalchat/local.env', 'src/node_modules/package/index.js', 'public/.output/server.js']) {
+      assert.equal(isTemplatePathAllowed(path.replaceAll('/', separator)), false, path);
+    }
+    for (const path of ['.env.example', 'src/routes/index.tsx', 'scripts/local/config.mjs', 'public/logo.svg']) {
+      assert.equal(isTemplatePathAllowed(path.replaceAll('/', separator)), true, path);
+    }
+  }
 });
 
 test('npm bin symlink executes the CLI entrypoint', async t => {
@@ -139,6 +151,22 @@ test('missing package manager preserves project and gives an actionable error', 
 test('local setup is explicit and incompatible with skipping dependencies', () => {
   assert.equal(parseArgs(['app', '--setup-local']).setupLocal, true);
   assert.throws(() => parseArgs(['--setup-local', '--skip-install']), /requires dependency installation/);
+});
+
+test('app start needs dependencies and excludes local database setup', () => {
+  assert.equal(parseArgs(['app', '--start']).start, true);
+  assert.throws(() => parseArgs(['--start', '--skip-install']), /requires dependency installation/);
+  assert.throws(() => parseArgs(['--start', '--setup-local']), /Choose/);
+});
+
+test('app start launches dev directly without starting Supabase', async t => {
+  const deps = await fixture(t);
+  const calls = [];
+  deps.run = async (...args) => { calls.push(args); return { status: 0 }; };
+  const destination = await createProject({ directory: 'app', packageManager: 'npm', install: true, start: true }, deps);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1][1], ['scripts/dev.mjs']);
+  assert.equal(calls[1][2].cwd, destination);
 });
 
 test('completion output covers supported shells without creating a project', () => {

@@ -1,5 +1,11 @@
 # Pemasangan LokalChat Open
 
+## Login tanpa konfigurasi Supabase
+
+Selepas scaffold dan dependencies dipasang, jalankan `npm run dev` dan buka `http://127.0.0.1:3000/auth`. Anda boleh daftar dan login tanpa `.env` atau Supabase lokal. Installer baharu menyokong `--start` untuk menjalankan app terus; release npm diperlukan sebelum flag ini tersedia melalui `@latest`.
+
+Akaun LokalChat disimpan dalam `.lokalchat/accounts.sqlite` dengan kata laluan dihash dan sesi cookie HttpOnly. Fail ini peribadi dan perlu storan persisten serta backup. `LOKALCHAT_ACCOUNT_DB` boleh menetapkan lokasi lain. Login LokalChat berasingan daripada sambungan data Supabase. Settings boleh menyimpan profil sambungan dan provider AI kemudian; simpanan profil tidak mengaktifkan runtime data atau memigrasi data secara automatik. Panduan Supabase lokal/hosted di bawah ialah pilihan integrasi data, bukan syarat daftar/login akaun LokalChat.
+
 Perlukan Node.js 22.13+ atau versi 24 ke atas (Node 23 tidak disokong; Node 24 LTS disyorkan), npm atau pnpm. Aplikasi ini menggunakan server Node/Nitro; hosting statik sahaja tidak mencukupi.
 
 ```sh

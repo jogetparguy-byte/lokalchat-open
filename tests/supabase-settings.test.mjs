@@ -132,7 +132,9 @@ function handlers(role, options = {}) {
   let reads = 0, writes = 0;
   const context = { userId: 'verified-account', supabase: { from() { if (options.forbidProfileRead) assert.fail('Supabase settings must not query admin roles'); return { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: role ? { role } : null, error: options.dbError ? { message: 'db-fixture' } : null }; } }; } } };
   // Exercise the real auth boundary with a stubbed Auth service, not a profile role.
-  const { requireSupabaseAuth } = loadModule('../src/integrations/supabase/auth-middleware.ts', {
+  const { requireAccountAuth: requireSupabaseAuth } = loadModule('../src/lib/account-middleware.ts', {
+    './account-http.server': { accountToken: () => undefined },
+    './account-store.server': { readAccount: () => null },
     '@tanstack/react-start': { createMiddleware: () => ({ server: fn => fn }) },
     '@tanstack/react-start/server': { getRequest: () => ({ headers: new Headers(options.noLogin ? {} : { authorization: 'Bearer fixture.jwt.token' }) }) },
     '@supabase/supabase-js': { createClient: () => ({ auth: { getClaims: async () => options.invalidToken
@@ -145,6 +147,7 @@ function handlers(role, options = {}) {
       return { middleware(items) { assert.equal(items.length, 1); assert.equal(items[0], requireSupabaseAuth); return this; }, inputValidator(fn) { validator = fn; return this; }, handler(fn) { return async (input = {}) => requireSupabaseAuth({ next: async () => fn({ context, data: await validator(input.data) }) }); } };
     } },
     '@/integrations/supabase/auth-middleware': { requireSupabaseAuth }, './metrics': {}, './delivery-error': {},
+    './account-middleware': { requireAccountAuth: requireSupabaseAuth },
     './supabase-settings': validation,
     './supabase-env.server': {
       getSupabaseEnvSettings: async owner => { assert.equal(owner, context.userId); reads++; return { hasPublicKey: true, hasSecretKey: true }; },
@@ -192,26 +195,22 @@ const {SupabaseSettingsSection} = loadModule('../src/components/lokalchat/Supaba
 });
 function renderSettings(data) {
   const client = new ReactQuery.QueryClient({defaultOptions: {queries: {retry: false}}});
-  if (data) client.setQueryData(['supabase-settings'], data);
+  if (data) client.setQueryData(['supabase-mcp'], data);
   try {return renderToStaticMarkup(React.createElement(ReactQuery.QueryClientProvider, {client}, React.createElement(SupabaseSettingsSection)));}
   finally {client.clear();}
 }
 
-test('actual user form enables masked fields and explains private profile scope', () => {
-  const html = renderSettings({canManage: true, projectUrl: input.projectUrl, hasPublicKey: false, hasSecretKey: false, requiresRestart: true});
-  for (const id of ['supabase-public-key', 'supabase-secret-key']) {
-    assert.match(html, new RegExp(`<label[^>]*for="${id}"`));
-    assert.match(html, new RegExp(`<input(?=[^>]*id="${id}")(?=[^>]*type="password")[^>]*>`));
-  }
-  assert.ok(html.includes('Data tidak dipindahkan'));
-  assert.ok(html.includes('Profil ini tidak menukar sambungan aplikasi'));
+test('Supabase section has one MCP connector button and no credential fields', () => {
+  const html = renderSettings({connected: false, needsReconnect: false});
+  assert.equal((html.match(/<button/g) || []).length, 1);
+  assert.ok(html.includes('MCP Connector'));
+  assert.doesNotMatch(html, /<input|<form|Simpan konfigurasi Supabase|service_role/);
   assert.equal(html.includes(input.secretKey), false);
-  assert.doesNotMatch(html, /<fieldset[^>]*disabled/);
-  assert.equal(html.includes('Hanya admin'), false);
-  assert.ok(html.includes('Paparkan secret key'));
 });
 
-test('actual form hides controls during loading', () => {
-  assert.ok(renderSettings().includes('Memuatkan konfigurasi Supabase'));
-  assert.equal(renderSettings().includes('id="supabase-secret-key"'), false);
+test('connector remains available while checking status and explains MCP connection scope', () => {
+  assert.ok(renderSettings().includes('Menyemak sambungan'));
+  assert.ok(renderSettings().includes('MCP Connector'));
+  assert.ok(renderSettings({connected: true, needsReconnect: false}).includes('Sambungan data aplikasi belum diaktifkan'));
+  assert.ok(renderSettings({connected: false, needsReconnect: true}).includes('Sambungan tamat'));
 });

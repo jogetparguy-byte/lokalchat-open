@@ -65,6 +65,7 @@ function harness(options = {}) {
   function require(name) {
     if (name === '@tanstack/react-start') return { createServerFn };
     if (name === '@/integrations/supabase/auth-middleware') return { requireSupabaseAuth: {} };
+    if (name === './account-middleware') return { requireAccountAuth: {} };
     if (name === './delivery-error') {
       const helper = { exports: {} };
       const helperSource = readFileSync(new URL('../src/lib/delivery-error.ts', import.meta.url), 'utf8');
