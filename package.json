@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "start": "node --env-file-if-exists=.env .output/server/index.mjs",
     "test": "node --import tsx tests/upload-document.test.mjs && node --import tsx tests/inbox.test.tsx && node tests/backend-delivery.test.mjs && node tests/delivery-error.test.mjs && node tests/check-env.test.mjs && node --import tsx --test tests/public-config.test.mjs && node tests/local-setup.test.mjs && npm run test:llm-settings && npm run test:supabase-settings && npm run test:theme && npm run test:settings && npm run test:tenant-env && node --import tsx tests/release-security.test.mjs && npm run test:account",
-    "test:account": "node --import tsx --test tests/account-auth.test.mjs tests/account-auth-attacher.test.mjs",
+    "test:account": "node --import tsx --test tests/account-auth.test.mjs tests/account-auth-attacher.test.mjs tests/onboarding.test.mjs",
     "test:theme": "node --import tsx tests/theme.test.mjs",
     "test:theme:ssr": "node tests/theme-ssr.mjs",
     "test:browser": "node tests/browser.test.mjs",

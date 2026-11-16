@@ -1,6 +1,7 @@
 import type { AuthChangeEvent, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { hasPublicConfig } from "./public-config";
+import type { OnboardingAnswers } from "./onboarding";
 
 type AccountSession = { user: User };
 const EVENT = "lokalchat-account-change";
@@ -38,8 +39,8 @@ export const accountAuth = {
       return { data: { session: null }, error: error as Error };
     }
   },
-  async signUp(input: { email: string; password: string; options?: { emailRedirectTo?: string; data?: { business_name?: string } } }) {
-    try { const user = await request({ action: "signup", email: input.email, password: input.password, businessName: input.options?.data?.business_name }); changed("SIGNED_IN", user); return { data: { session: user ? { user } : null }, error: null }; }
+  async signUp(input: { email: string; password: string; options?: { emailRedirectTo?: string; data?: { business_name?: string; onboarding?: OnboardingAnswers } } }) {
+    try { const user = await request({ action: "signup", email: input.email, password: input.password, businessName: input.options?.data?.business_name, onboarding: input.options?.data?.onboarding }); changed("SIGNED_IN", user); return { data: { session: user ? { user } : null }, error: null }; }
     catch (error) { return { data: { session: null }, error: error as Error }; }
   },
   async updateUser(input: { data?: Record<string, unknown>; password?: string; current_password?: string; nonce?: string }) {

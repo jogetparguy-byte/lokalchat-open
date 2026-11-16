@@ -3,6 +3,7 @@ import { chmodSync, lstatSync, mkdirSync, openSync, closeSync, constants } from 
 import { dirname, resolve } from "node:path";
 import { createHash, randomBytes, randomUUID, scrypt as derive, timingSafeEqual } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
+import { parseOnboarding } from "./onboarding";
 
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
 type AccountRow = { id: string; email: string; salt: string; password: string; metadata: string; profile: string; created_at: string };
@@ -53,7 +54,7 @@ function throttle(email: string) {
   finally { db.close(); }
 }
 
-export async function authenticateAccount(input: { email: string; password: string; businessName?: string }, signup: boolean, oldToken?: string) {
+export async function authenticateAccount(input: { email: string; password: string; businessName?: string; onboarding?: unknown }, signup: boolean, oldToken?: string) {
   const email = input.email?.trim().toLowerCase();
   const password = input.password;
   if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Masukkan alamat emel yang sah.");
@@ -68,7 +69,7 @@ export async function authenticateAccount(input: { email: string; password: stri
     if (signup) {
       if (row) throw new Error("Pendaftaran tidak berjaya. Cuba log masuk atau gunakan emel lain.");
       const name = (input.businessName || "Kedai Saya").trim().slice(0, 160) || "Kedai Saya";
-      row = { id: randomUUID(), email, salt, password: derived.toString("hex"), metadata: JSON.stringify({ business_name: name }), profile: JSON.stringify({ business_name: name, inventory_api_url: null, owner_whatsapp: null }), created_at: new Date().toISOString() };
+      row = { id: randomUUID(), email, salt, password: derived.toString("hex"), metadata: JSON.stringify({ business_name: name, ...parseOnboarding(input.onboarding) }), profile: JSON.stringify({ business_name: name, inventory_api_url: null, owner_whatsapp: null }), created_at: new Date().toISOString() };
       try { db.prepare("INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?)").run(row.id, row.email, row.salt, row.password, row.metadata, row.profile, row.created_at); }
       catch { throw new Error("Pendaftaran tidak berjaya. Cuba log masuk atau gunakan emel lain."); }
     } else if (!row || !timingSafeEqual(derived, Buffer.from(row.password, "hex")) || (db.prepare("SELECT password FROM accounts WHERE id = ?").get(row.id) as { password: string } | undefined)?.password !== row.password) {
