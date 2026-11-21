@@ -8,7 +8,7 @@ The callback validates the account session, state, expiry and callback origin, c
 
 `GET /api/supabase/mcp` without callback parameters returns `connected` and `needsReconnect`. It refreshes tokens near expiry. Credentials and pending flows are stored in the existing per-user settings file with mode `0600`. Values are base64url encoded for serialization; this is not encryption. They never appear in status responses or browser storage.
 
-This connection grants MCP access to the Supabase organization selected during consent. It does not activate LokalChat's chat, knowledge base or WhatsApp data runtime. Those still require backend identity mapping and RLS integration.
+This connection grants MCP access to the Supabase organization selected during consent. It does not select or activate LokalChat's data backend. Local accounts access the installation's configured backend through the server-side identity bridge described in [Local accounts and backend data](LOCAL_ACCOUNT_DATA.md); database and Storage RLS remain enforced for each account.
 
 Verification: `node --import tsx --test tests/supabase-mcp.test.mjs`. Tests cover account isolation, PKCE, CSRF, callback replay, cancellation, MCP initialization failure, JSON/SSE responses, private storage, token refresh and logout.
 

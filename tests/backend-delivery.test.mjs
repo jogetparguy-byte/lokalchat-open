@@ -64,8 +64,10 @@ function harness(options = {}) {
   const module = { exports: {} };
   function require(name) {
     if (name === '@tanstack/react-start') return { createServerFn };
+    if (name === '@tanstack/react-start/server') return { getRequest() { throw new Error('Delivery tests must not access account request context'); } };
     if (name === '@/integrations/supabase/auth-middleware') return { requireSupabaseAuth: {} };
     if (name === './account-middleware') return { requireAccountAuth: {} };
+    if (name === './delivery-status.server') return { recordWhatsAppAcceptance: async () => false };
     if (name === './delivery-error') {
       const helper = { exports: {} };
       const helperSource = readFileSync(new URL('../src/lib/delivery-error.ts', import.meta.url), 'utf8');
@@ -129,6 +131,16 @@ test('retry rejects pending human and failed bot rows', async () => {
     await assert.rejects(h.api.retryFailedHumanReply({ data: { messageId: requestId } }), /Only/);
     assert.equal(h.sends, 0);
   }
+});
+
+test('inbox preserves multipart order when timestamps match and IDs sort differently', async () => {
+ const h = harness({ messages: [
+   { id: 'a', chat_id: 'chat-a', sender: 'bot', text: 'Second', created_at: '2026-11-15T00:00:00Z', reply_sequence: 1 },
+   { id: 'z', chat_id: 'chat-a', sender: 'bot', text: 'First', created_at: '2026-11-15T00:00:00Z', reply_sequence: 0 },
+   { id: 'b', chat_id: 'chat-a', sender: 'bot', text: 'Third', created_at: '2026-11-15T00:00:00Z', reply_sequence: 2 },
+ ] });
+ const result = await h.api.listMessages({ data: { chatId: 'chat-a' } });
+ assert.deepEqual(Array.from(result, row => row.text), ['First', 'Second', 'Third']);
 });
 
 test('retry of sent reply reconciles without provider call', async () => {

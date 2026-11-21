@@ -160,6 +160,7 @@ function handlers(role, options = {}) {
       : { data: { claims: { sub: context.userId } }, error: null } } }) },
   }, { process: { env: { SUPABASE_URL: 'https://fixture.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'fixture-public-key' } } });
   const api = loadModule('../src/lib/lokalchat.functions.ts', {
+    '@tanstack/react-start/server': { getRequest: () => ({ headers: new Headers() }) },
     '@tanstack/react-start': { createServerFn() {
       let validator = value => value;
       return { middleware(items) { assert.equal(items.length, 1); assert.equal(items[0], requireSupabaseAuth); return this; }, inputValidator(fn) { validator = fn; return this; }, handler(fn) { return async (input = {}) => requireSupabaseAuth({ next: async () => fn({ context, data: await validator(input.data) }) }); } };

@@ -28,6 +28,12 @@ test('only exact public messages are retained without appended data', () => {
     assert.equal(errors.safeDeliveryError(message + ' token=sample'), errors.DELIVERY_ERRORS.failed);
   }
 });
+test('asynchronous provider failures expose bounded numeric codes without provider prose', () => {
+  const message = errors.providerDeliveryFailure([131047, -1, NaN, 'Bearer secret']);
+  assert.equal(message, 'Meta gagal menghantar (kod 131047). Semak sambungan, penerima dan template sebelum cuba semula.');
+  assert.equal(errors.safeDeliveryError(message), message);
+  assert.equal(errors.safeDeliveryError(message + ' Bearer secret'), errors.DELIVERY_ERRORS.failed);
+});
 
 function transportHarness(status, throwing = false) {
   const updates = [];
@@ -36,6 +42,7 @@ function transportHarness(status, throwing = false) {
     if (name === '@/integrations/supabase/client.server') return { supabaseAdmin: { from() { return builder; } } };
     if (name === './wa-crypto.server') return { decryptSecret() { return 'sample-secret'; } };
     if (name === './delivery-error') return errors;
+    if (name === './whatsapp-window.server') return { customerServiceWindowOpen: async () => true, whatsappRecipientId: value => value };
     throw new Error('Unexpected import: ' + name);
   }, { fetch: async () => {
     if (throwing) throw new Error('Bearer sample-secret https://user:password@host');

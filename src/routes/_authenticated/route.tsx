@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { accountAuth } from "@/lib/account-auth";
 import { useRouterState } from "@tanstack/react-router";
 import { AccountSetup } from "@/components/lokalchat/AccountSetup";
+import { AccountIdentityContext } from "@/components/lokalchat/AccountIdentityContext";
+import { getAccountDataStatus, useApi } from "@/services/api";
+import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -48,13 +51,22 @@ function AuthenticatedLayout() {
     return () => { active = false; data.subscription.unsubscribe(); };
   }, [navigate]);
   // Server authorization is enforced separately on every server function.
-  return verified ? <AccountQueries key={verified} localAccount={localAccount} /> : <p role="status" className="p-8 text-sm">Menyemak sesi…</p>;
+  return verified ? <AccountQueries key={verified} owner={verified} localAccount={localAccount} /> : <p role="status" className="p-8 text-sm">Menyemak sesi…</p>;
 }
 
-function AccountQueries({ localAccount }: { localAccount: boolean }) {
-  const pathname = useRouterState({ select: state => state.location.pathname });
+function AccountQueries({ owner, localAccount }: { owner: string; localAccount: boolean }) {
   // Remounting by verified account also isolates late query and mutation results.
   const [client] = useState(() => new QueryClient());
   useEffect(() => () => { client.clear(); }, [client]);
-  return <QueryClientProvider client={client}>{localAccount && pathname !== "/dashboard/settings" ? <AccountSetup /> : <Outlet />}</QueryClientProvider>;
+  return <AccountIdentityContext.Provider value={owner}><QueryClientProvider client={client}><AccountDataGate localAccount={localAccount} /></QueryClientProvider></AccountIdentityContext.Provider>;
+}
+
+function AccountDataGate({ localAccount }: { localAccount: boolean }) {
+  const pathname = useRouterState({ select: state => state.location.pathname });
+  const fetchStatus = useApi(getAccountDataStatus);
+  const status = useQuery({ queryKey: ["account-data-status"], queryFn: () => fetchStatus(), enabled: localAccount, retry: false, refetchOnMount: "always" });
+  if (!localAccount || pathname === "/dashboard/settings") return <Outlet />;
+  if (status.isPending) return <p role="status" className="p-8 text-sm">Menyediakan sambungan data…</p>;
+  if (!status.data?.ready) return <AccountSetup />;
+  return <Outlet />;
 }

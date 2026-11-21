@@ -138,6 +138,9 @@ function load(relative, dependencies, globals = {}) {
     exports: module.exports,
     require: (name) => {
       if (name in dependencies) return dependencies[name];
+      if (["./agent-prompt.server", "./commercial-grounding.server"].includes(name)) {
+        return load(`../src/lib/${name.slice(2)}.ts`, dependencies, globals);
+      }
       throw Error(`Unexpected import ${name}`);
     },
     console,
@@ -191,6 +194,7 @@ test("profile server saves only submitted fields, checks tenant and rejects priv
     };
   }
   const api = load("../src/lib/lokalchat.functions.ts", {
+    "@tanstack/react-start/server": { getRequest: () => ({ headers: new Headers() }) },
     "@tanstack/react-start": { createServerFn },
     "@/integrations/supabase/auth-middleware": { requireSupabaseAuth: {} },
     "./account-middleware": { requireAccountAuth: {} },
@@ -286,11 +290,15 @@ test("weekly report hook honors opt-out, skips unreadable preferences and contin
     },
     "@/integrations/supabase/client.server": { supabaseAdmin: admin },
     "@/lib/whatsapp.server": {
-      async sendWhatsAppMessage(_number, _text, id) {
+      async sendWhatsAppTemplate(_number, _template, id) {
         sent.push(id);
         return { ok: true };
       },
     },
+    "@/lib/whatsapp-window.server": {
+      async weeklyReportTemplate() { return { name: "weekly_report", language: "ms" }; },
+    },
+    "@/lib/delivery-status.server": { async recordWhatsAppReportAcceptance() { return true; } },
   });
   const request = new Request(
     "https://app.test/api/public/hooks/weekly-report",
@@ -306,6 +314,10 @@ test("agent applies the saved account reply language to the real gateway prompt"
   for (const language of ["en", "ms", "auto"]) {
     const prompts = [];
     const admin = {
+      async rpc(name) {
+        assert.equal(name, "load_chat_turn_history");
+        return { data: [], error: null };
+      },
       auth: {
         admin: {
           async getUserById(id) {
@@ -320,6 +332,7 @@ test("agent applies the saved account reply language to the real gateway prompt"
         },
       },
       from(table) {
+        let inserted;
         return {
           select() {
             return this;
@@ -336,17 +349,18 @@ test("agent applies the saved account reply language to the real gateway prompt"
           update() {
             return this;
           },
-          insert() {
+          insert(value) {
+            inserted = value;
             return this;
           },
           async maybeSingle() {
-            return { data: { business_id: "owner-a" }, error: null };
+            return { data: { business_id: "owner-a", is_bot_active: true, bot_generation: 0 }, error: null };
           },
           async single() {
-            return { data: { id: "bot-a" }, error: null };
+            return { data: { id: "bot-a", is_bot_active: true, bot_generation: 0 }, error: null };
           },
           then(resolve) {
-            return Promise.resolve({ data: [], error: null }).then(resolve);
+            return Promise.resolve({ data: inserted ? inserted.map((row, index) => ({ id: `bot-${index}`, ...row })) : [], error: null }).then(resolve);
           },
         };
       },
@@ -354,10 +368,12 @@ test("agent applies the saved account reply language to the real gateway prompt"
     const { runAgent } = load(
       "../src/lib/agent.server.ts",
       {
+        "node:crypto": { randomUUID: () => "simulator-test" },
         "@/integrations/supabase/client.server": { supabaseAdmin: admin },
         "./preferences": { accountPreferences, replyInstruction },
         "./embeddings.server": {},
         "./whatsapp.server": {},
+        "./delivery-status.server": {},
         "./platform-key.server": {
           async getActiveLlmConfig(ownerId) {
             assert.equal(ownerId, "owner-a");
@@ -396,7 +412,7 @@ test("agent applies the saved account reply language to the real gateway prompt"
     });
     assert.equal(result.reply, "Fixture reply");
     assert.ok(
-      prompts[0].messages[0].content.endsWith(replyInstruction(language)),
+      prompts[0].messages[0].content.includes(replyInstruction(language)),
     );
   }
 });

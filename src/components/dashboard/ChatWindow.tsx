@@ -1,6 +1,7 @@
 import { usePreferences } from "@/components/lokalchat/usePreferences";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { safeDeliveryError } from "@/lib/delivery-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -14,7 +15,9 @@ export type MessageRow = {
   sender: "customer" | "bot" | "human" | "system";
   text: string;
   created_at: string;
-  delivery_status: "pending" | "sending" | "sent" | "failed" | null;
+  delivery_status: "pending" | "sending" | "sent" | "failed" | "cancelled" | null;
+  provider_delivery_status?: "accepted" | "sent" | "delivered" | "read" | "failed" | null;
+  provider_status_at?: string | null;
   last_delivery_error: string | null;
   sent_at: string | null;
   delivery_attempts: number | null;
@@ -25,7 +28,10 @@ export const deliveryLabels = {
   sending: "Sedang dihantar",
   sent: "Diterima Meta",
   failed: "Penghantaran gagal",
+  cancelled: "Dibatalkan selepas perubahan kawalan bot",
 } as const;
+
+export const providerDeliveryLabels = { accepted: "Diterima Meta", sent: "Dihantar oleh Meta", delivered: "Diterima pelanggan", read: "Dibaca pelanggan", failed: "Meta gagal menghantar" } as const;
 
 export function ChatWindow({ chat, messages, onToggleBot, onSend, onRetry, sending, toggling, retryingId, loading, error }: {
   chat: ChatRow | null;
@@ -72,9 +78,9 @@ export function ChatWindow({ chat, messages, onToggleBot, onSend, onRetry, sendi
                   <span className="mb-0.5 block text-[10px] uppercase tracking-wide opacity-70">{message.sender}</span>
                   <span className="whitespace-pre-wrap">{message.text}</span>
                   {status && <div className="mt-2 border-t border-current/20 pt-1 text-xs">
-                    <span className={cn("inline-block rounded px-1.5 py-0.5 font-medium", status === "failed" ? "bg-destructive text-destructive-foreground" : "bg-background/70 text-foreground")}>{tr(deliveryLabels[status])}</span>
-                    {status === "sent" && <p className="mt-1 opacity-80">{tr("Belum mengesahkan diterima atau dibaca pelanggan.")}</p>}
-                    {status === "failed" && message.last_delivery_error && <p className="mt-1">{tr("Penghantaran tidak berjaya. Semak sambungan WhatsApp anda dan cuba semula.")}</p>}
+                    <span className={cn("inline-block rounded px-1.5 py-0.5 font-medium", status === "failed" ? "bg-destructive text-destructive-foreground" : "bg-background/70 text-foreground")}>{tr(message.provider_delivery_status ? providerDeliveryLabels[message.provider_delivery_status] : deliveryLabels[status])}</span>
+                    {status === "sent" && !["delivered", "read"].includes(message.provider_delivery_status ?? "") && <p className="mt-1 opacity-80">{tr("Belum mengesahkan diterima atau dibaca pelanggan.")}</p>}
+                    {status === "failed" && message.last_delivery_error && <p className="mt-1">{safeDeliveryError(message.last_delivery_error)}</p>}
                     {message.delivery_attempts != null && <p className="mt-1 opacity-70">{tr("Cubaan: ")}{message.delivery_attempts}</p>}
                     {status === "failed" && message.sender === "human" && <Button type="button" size="sm" variant="outline" className="mt-2 text-foreground" disabled={retryingId !== null || sending} onClick={() => onRetry(message.id)}>{retryingId === message.id ? tr("Mencuba semula…") : tr("Cuba Semula")}</Button>}
                   </div>}

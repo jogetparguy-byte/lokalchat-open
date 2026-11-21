@@ -8,6 +8,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { decryptSecret } from "./wa-crypto.server";
 import { DELIVERY_ERRORS, deliveryErrorForStatus } from "./delivery-error";
+import { customerServiceWindowOpen, whatsappRecipientId } from "./whatsapp-window.server";
 
 export const GRAPH_VERSION = process.env["WHATSAPP_GRAPH_VERSION"] || "v21.0";
 
@@ -87,6 +88,16 @@ export type WhatsappSendResult = {
   dryRun?: boolean;
   status?: number;
   error?: string;
+  providerMessageId?: string;
+  providerPhoneNumberId?: string;
+  trackingUncertain?: boolean;
+  retryable?: boolean;
+};
+
+export type WhatsappTemplate = {
+  name: string;
+  language: string;
+  bodyParameters?: string[];
 };
 
 export async function sendWhatsAppMessage(
@@ -95,16 +106,59 @@ export async function sendWhatsAppMessage(
   businessId?: string | null,
   options?: { allowDryRun?: boolean },
 ): Promise<WhatsappSendResult> {
+  return sendWhatsAppPayload(to, { type: "text", text: { body: text } }, businessId, options);
+}
+
+export async function sendWhatsAppTemplate(
+  to: string,
+  template: WhatsappTemplate,
+  businessId: string,
+): Promise<WhatsappSendResult> {
+  if (!/^[a-z0-9_]{1,512}$/.test(template.name)
+    || !/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(template.language)
+    || (template.bodyParameters && (!Array.isArray(template.bodyParameters)
+      || template.bodyParameters.length > 20
+      || template.bodyParameters.some(value => typeof value !== "string" || value.length > 32768)))) {
+    return { ok: false, error: DELIVERY_ERRORS.template, retryable: false };
+  }
+  return sendWhatsAppPayload(to, {
+    type: "template",
+    template: {
+      name: template.name,
+      language: { code: template.language },
+      ...(template.bodyParameters?.length ? {
+        components: [{ type: "body", parameters: template.bodyParameters.map(text => ({ type: "text", text })) }],
+      } : {}),
+    },
+  }, businessId);
+}
+
+async function sendWhatsAppPayload(
+  to: string,
+  payload: Record<string, unknown>,
+  businessId?: string | null,
+  options?: { allowDryRun?: boolean },
+): Promise<WhatsappSendResult> {
   try {
     const creds = businessId ? await getWhatsappCredentials(businessId) : null;
 
     if (!creds) {
       if (options?.allowDryRun) {
-        console.info("[whatsapp:dry-run] message queued", { toLength: to.length, textLength: text.length });
+        console.info("[whatsapp:dry-run] message queued", { toLength: to.length });
         return { ok: true, dryRun: true };
       }
       console.error("[whatsapp] No usable credentials", { businessId: businessId ?? "unknown" });
       return { ok: false, error: DELIVERY_ERRORS.connection };
+    }
+
+    const recipient = whatsappRecipientId(to);
+    if (!recipient) return { ok: false, error: DELIVERY_ERRORS.recipient, retryable: false };
+    if (recipient.includes(".") && process.env["WHATSAPP_BSUID_ENABLED"] !== "true") {
+      return { ok: false, error: DELIVERY_ERRORS.bsuidUnavailable, retryable: false };
+    }
+    if (payload["type"] === "text"
+      && !(await customerServiceWindowOpen(businessId!, creds.phoneNumberId, recipient))) {
+      return { ok: false, error: DELIVERY_ERRORS.windowClosed, retryable: false };
     }
 
     const res = await fetch(
@@ -117,9 +171,8 @@ export async function sendWhatsAppMessage(
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
-          to,
-          type: "text",
-          text: { body: text },
+          ...(recipient.includes(".") ? { recipient } : { to: recipient }),
+          ...payload,
         }),
         signal: AbortSignal.timeout(15000),
       },
@@ -143,9 +196,15 @@ export async function sendWhatsAppMessage(
       };
     }
 
-    return { ok: true, status: res.status };
+    const response = await res.json().catch(() => null);
+    const providerMessageId = response?.messages?.[0]?.id;
+    if (typeof providerMessageId !== "string" || !providerMessageId || providerMessageId.length > 512) {
+      return { ok: true, status: res.status, providerPhoneNumberId: creds.phoneNumberId,
+        trackingUncertain: true, error: DELIVERY_ERRORS.uncertain };
+    }
+    return { ok: true, status: res.status, providerMessageId, providerPhoneNumberId: creds.phoneNumberId };
   } catch (error) {
-    console.error("WhatsApp send failed before confirmation", { message: error instanceof Error ? error.message : String(error) });
+    console.error("WhatsApp send failed before confirmation");
     return { ok: false, error: DELIVERY_ERRORS.failed };
   }
 }

@@ -14,33 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      handoff_tasks: {
+        Row: { id: string; business_id: string; chat_id: string; source_key: string; status: string; created_at: string; due_at: string; accepted_at: string | null; resolved_at: string | null }
+        Insert: { id?: string; business_id?: string; chat_id?: string; source_key?: string; status?: string; created_at?: string; due_at?: string; accepted_at?: string | null; resolved_at?: string | null }
+        Update: { id?: string; business_id?: string; chat_id?: string; source_key?: string; status?: string; created_at?: string; due_at?: string; accepted_at?: string | null; resolved_at?: string | null }
+        Relationships: []
+      }
+      handoff_notifications: {
+        Row: { id: string; task_id: string; business_id: string; stage: string; channel: string; status: string; attempts: number; next_attempt_at: string; lease_token: string | null; started_at: string | null; completed_at: string | null; last_error: string | null; provider_message_id: string | null; provider_phone_number_id: string | null; provider_delivery_status: string | null }
+        Insert: { id?: string; task_id?: string; business_id?: string; stage?: string; channel?: string; status?: string; attempts?: number; next_attempt_at?: string; lease_token?: string | null; started_at?: string | null; completed_at?: string | null; last_error?: string | null; provider_message_id?: string | null; provider_phone_number_id?: string | null; provider_delivery_status?: string | null }
+        Update: { id?: string; task_id?: string; business_id?: string; stage?: string; channel?: string; status?: string; attempts?: number; next_attempt_at?: string; lease_token?: string | null; started_at?: string | null; completed_at?: string | null; last_error?: string | null; provider_message_id?: string | null; provider_phone_number_id?: string | null; provider_delivery_status?: string | null }
+        Relationships: []
+      }
+
+      whatsapp_service_windows: {
+        Row: { business_id: string; phone_number_id: string; recipient_id: string; last_customer_message_at: string }
+        Insert: { business_id: string; phone_number_id: string; recipient_id: string; last_customer_message_at: string }
+        Update: { business_id?: string; phone_number_id?: string; recipient_id?: string; last_customer_message_at?: string }
+        Relationships: []
+      }
+
       chats: {
         Row: {
+          customer_bsuid: string | null
+          customer_phone_number: string | null
           business_id: string
           created_at: string
           customer_name: string | null
           customer_phone: string
           id: string
+          bot_generation: number
           is_bot_active: boolean
           last_message: string | null
           updated_at: string
         }
         Insert: {
+          customer_bsuid?: string | null
+          customer_phone_number?: string | null
           business_id: string
           created_at?: string
           customer_name?: string | null
           customer_phone: string
           id?: string
+          bot_generation?: number
           is_bot_active?: boolean
           last_message?: string | null
           updated_at?: string
         }
         Update: {
+          customer_bsuid?: string | null
+          customer_phone_number?: string | null
           business_id?: string
           created_at?: string
           customer_name?: string | null
           customer_phone?: string
           id?: string
+          bot_generation?: number
           is_bot_active?: boolean
           last_message?: string | null
           updated_at?: string
@@ -206,6 +235,12 @@ export type Database = {
       }
       messages: {
         Row: {
+          provider_message_id: string | null
+          provider_phone_number_id: string | null
+          provider_delivery_status: string | null
+          provider_status_at: string | null
+          inbound_type: string | null
+          inbound_metadata: Json | null
           client_request_id: string | null
           chat_id: string
           created_at: string
@@ -217,13 +252,25 @@ export type Database = {
           last_delivery_error: string | null
           processed_at: string | null
           processing_started_at: string | null
+          processing_attempts: number
+          processing_token: string | null
           processing_status: string
           reply_to_external_message_id: string | null
+          bot_generation: number | null
+          bot_reply_kind: string | null
+          allow_dry_run: boolean
+          reply_sequence: number
           sender: Database["public"]["Enums"]["message_sender"]
           sent_at: string | null
           text: string
         }
         Insert: {
+          provider_message_id?: string | null
+          provider_phone_number_id?: string | null
+          provider_delivery_status?: string | null
+          provider_status_at?: string | null
+          inbound_type?: string | null
+          inbound_metadata?: Json | null
           client_request_id?: string | null
           chat_id: string
           created_at?: string
@@ -235,13 +282,25 @@ export type Database = {
           last_delivery_error?: string | null
           processed_at?: string | null
           processing_started_at?: string | null
+          processing_attempts?: number
+          processing_token?: string | null
           processing_status?: string
           reply_to_external_message_id?: string | null
+          bot_generation?: number | null
+          bot_reply_kind?: string | null
+          allow_dry_run?: boolean
+          reply_sequence?: number
           sender: Database["public"]["Enums"]["message_sender"]
           sent_at?: string | null
           text: string
         }
         Update: {
+          provider_message_id?: string | null
+          provider_phone_number_id?: string | null
+          provider_delivery_status?: string | null
+          provider_status_at?: string | null
+          inbound_type?: string | null
+          inbound_metadata?: Json | null
           client_request_id?: string | null
           chat_id?: string
           created_at?: string
@@ -253,8 +312,14 @@ export type Database = {
           last_delivery_error?: string | null
           processed_at?: string | null
           processing_started_at?: string | null
+          processing_attempts?: number
+          processing_token?: string | null
           processing_status?: string
           reply_to_external_message_id?: string | null
+          bot_generation?: number | null
+          bot_reply_kind?: string | null
+          allow_dry_run?: boolean
+          reply_sequence?: number
           sender?: Database["public"]["Enums"]["message_sender"]
           sent_at?: string | null
           text?: string
@@ -298,6 +363,10 @@ export type Database = {
       }
       profiles: {
         Row: {
+          handoff_notification_channel: string
+          weekly_report_provider_message_id: string | null
+          weekly_report_provider_status: string | null
+          weekly_report_delivery_error: string | null
           business_name: string
           checklist_celebrated_at: string | null
           checklist_dismissed_session: string | null
@@ -312,6 +381,10 @@ export type Database = {
           weekly_report_sent_at: string | null
         }
         Insert: {
+          handoff_notification_channel?: string
+          weekly_report_provider_message_id?: string | null
+          weekly_report_provider_status?: string | null
+          weekly_report_delivery_error?: string | null
           business_name?: string
           checklist_celebrated_at?: string | null
           checklist_dismissed_session?: string | null
@@ -326,6 +399,10 @@ export type Database = {
           weekly_report_sent_at?: string | null
         }
         Update: {
+          handoff_notification_channel?: string
+          weekly_report_provider_message_id?: string | null
+          weekly_report_provider_status?: string | null
+          weekly_report_delivery_error?: string | null
           business_name?: string
           checklist_celebrated_at?: string | null
           checklist_dismissed_session?: string | null
@@ -532,6 +609,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_handoff_notifications: { Args: Record<string,never>; Returns: Database['public']['Tables']['handoff_notifications']['Row'][] }
+      finish_handoff_notification: { Args: { p_id: string; p_token: string; p_status: string; p_error?: string | null; p_provider_message_id?: string | null; p_phone_number_id?: string | null }; Returns: boolean }
+      transition_handoff_task: { Args: { p_task_id: string; p_expected_status: string; p_status: string }; Returns: boolean }
+      retry_handoff_notification: { Args: { p_id: string }; Returns: boolean }
+
+      record_whatsapp_customer_event: { Args: { p_business_id: string; p_phone_number_id: string; p_recipient_id: string; p_provider_timestamp: string }; Returns: boolean }
+      register_whatsapp_report_acceptance: { Args: { p_business_id: string; p_phone_number_id: string; p_provider_message_id: string }; Returns: undefined }
+      register_whatsapp_acceptance: { Args: { p_business_id: string; p_message_id: string; p_phone_number_id: string; p_provider_message_id: string }; Returns: undefined }
+      record_whatsapp_delivery_status: { Args: { p_business_id: string; p_phone_number_id: string; p_provider_message_id: string; p_status: string; p_occurred_at: string; p_error?: string | null }; Returns: undefined }
+      persist_whatsapp_inbound: { Args: { p_business_id: string; p_external_message_id: string; p_phone: string | null; p_bsuid: string | null; p_name: string | null; p_type: string; p_text: string; p_metadata: Json; p_needs_handoff: boolean; p_phone_number_id: string; p_provider_timestamp?: string | null }; Returns: { chat_id: string; recipient_id: string }[] }
+
+      claim_chat_turn: { Args: { p_chat_id: string; p_external_message_id: string }; Returns: string | null }
+      finish_chat_turn: { Args: { p_chat_id: string; p_external_message_id: string; p_token: string; p_status: string }; Returns: undefined }
+
+      handoff_chat: { Args: { p_chat_id: string; p_generation: number; p_token: string | null }; Returns: number | null }
+      claim_bot_reply: { Args: { p_message_id: string; p_token: string }; Returns: string }
+      load_chat_turn_history: { Args: { p_chat_id: string; p_external_message_id: string | null }; Returns: { sender: string; text: string }[] }
+
+      list_recoverable_inbound_messages: {
+        Args: Record<string, never>
+        Returns: { id: string; chat_id: string; business_id: string; customer_phone: string; text: string; external_message_id: string; allow_dry_run: boolean }[]
+      }
       claim_inbound_message: {
         Args: {
           p_chat_id: string

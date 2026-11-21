@@ -40,3 +40,12 @@ test("stored provider error renders as escaped text", () => {
   assert.ok(!html.includes('<script>alert'));
   assert.ok(!html.includes("&lt;script&gt;"));
 });
+
+test("provider receipt and read statuses replace acceptance caveat", () => {
+ for (const [provider,label] of [["delivered","Diterima pelanggan"],["read","Dibaca pelanggan"]] as const) {
+  const html=render([{...message("human","sent"),provider_delivery_status:provider}]);
+  assert.ok(html.includes(label)); assert.ok(!html.includes("Belum mengesahkan diterima"));
+ }
+ const html=render([{...message("human","failed"),provider_delivery_status:"failed",last_delivery_error:"Meta gagal menghantar (kod 131026). Semak sambungan, penerima dan template sebelum cuba semula."}]);
+ assert.ok(html.includes("131026")); assert.ok(html.includes("Meta gagal menghantar"));
+});

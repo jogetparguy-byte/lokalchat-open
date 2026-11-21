@@ -26,8 +26,18 @@ function database() {
     CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, password TEXT NOT NULL, metadata TEXT NOT NULL, profile TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL, expires INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS sessions_account ON sessions(account_id);
-    CREATE TABLE IF NOT EXISTS attempts (key TEXT PRIMARY KEY, count INTEGER NOT NULL, until INTEGER NOT NULL);`);
+    CREATE TABLE IF NOT EXISTS attempts (key TEXT PRIMARY KEY, count INTEGER NOT NULL, until INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS installation (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
   return db;
+}
+
+/** A copied account database keeps its identity; a fresh installation cannot adopt its backend users. */
+export function accountInstallationId(): string {
+  const db = database();
+  try {
+    db.prepare("INSERT OR IGNORE INTO installation (key, value) VALUES ('id', ?)").run(randomUUID());
+    return (db.prepare("SELECT value FROM installation WHERE key = 'id'").get() as { value: string }).value;
+  } finally { db.close(); }
 }
 
 async function passwordHash(password: string, salt: string) {

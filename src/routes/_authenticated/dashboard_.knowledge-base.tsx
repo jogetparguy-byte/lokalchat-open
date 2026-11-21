@@ -5,8 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "@/services/api";
 import { toast } from "sonner";
 import { ConsoleShell } from "@/components/lokalchat/ConsoleShell";
-import { supabase } from "@/integrations/supabase/client";
-import { uploadDocument } from "@/lib/upload-document";
 import { FaqSection } from "@/components/lokalchat/FaqSection";
 import {
   AlertDialog,
@@ -23,7 +21,7 @@ import {
   getSystemPrompt,
   listKbDocuments,
   processKbDocument,
-  recordKbDocument,
+  uploadKbDocument,
   saveSystemPrompt,
 } from "@/services/api";
 
@@ -64,10 +62,12 @@ function KnowledgeBasePage() {
   const [prompt, setPrompt] = useState("");
   const promptDirty = useRef(false);
   const uploadingRef = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const fetchDocs = useApi(listKbDocuments);
-  const recordDoc = useApi(recordKbDocument);
+  const uploadDoc = useApi(uploadKbDocument);
   const processDoc = useApi(processKbDocument);
   const removeDoc = useApi(deleteKbDocument);
   const fetchPrompt = useApi(getSystemPrompt);
@@ -110,25 +110,20 @@ function KnowledgeBasePage() {
     uploadingRef.current = true;
     setUploading(true);
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      const userId = userData.user?.id;
-      if (!userId) throw new Error(tr("Sesi tamat. Sila log masuk semula."));
-
       for (const file of list) {
+        if (!mounted.current) return;
         try {
-          const id = await uploadDocument({
-            file,
-            userId,
-            nonce: crypto.randomUUID(),
-            storage: supabase.storage.from("kb-documents"),
-            record: recordDoc,
-          });
+          const form = new FormData();
+          form.set("file", file);
+          const { id } = await uploadDoc({ data: form });
+          if (!mounted.current) return;
           await queryClient.invalidateQueries({ queryKey: ["kb-documents"] });
           const result = await processDoc({ data: { id } });
+          if (!mounted.current) return;
           if (result.ok) toast.success(`${file.name} berjaya diproses`);
           else toast.error(`${file.name}: ${"message" in result ? result.message : tr("Ralat memproses fail")}`);
         } catch (error) {
+          if (!mounted.current) return;
           toast.error(`${file.name}: ${error instanceof Error ? error.message : tr("Muat naik gagal")}`);
         } finally {
           await queryClient.invalidateQueries({ queryKey: ["kb-documents"] });
@@ -137,11 +132,13 @@ function KnowledgeBasePage() {
       }
       queryClient.invalidateQueries({ queryKey: ["kb-documents"] });
     } catch (error) {
-      toast.error((error as Error).message);
+      if (mounted.current) toast.error((error as Error).message);
     } finally {
       uploadingRef.current = false;
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
+      if (mounted.current) {
+        setUploading(false);
+        if (inputRef.current) inputRef.current.value = "";
+      }
     }
   }
 

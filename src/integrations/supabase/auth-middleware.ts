@@ -32,7 +32,13 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
-    
+    const request = getRequest();
+    const { accountToken } = await import("@/lib/account-http.server");
+    if (accountToken(request) !== undefined) {
+      const { localBackendContext } = await import("@/lib/account-backend.server");
+      const { supabase, userId, claims } = await localBackendContext(request);
+      return next({ context: { supabase, userId, claims: claims as Record<string, unknown> } });
+    }
     const SUPABASE_URL = process.env['SUPABASE_URL'];
     const SUPABASE_PUBLISHABLE_KEY = process.env['SUPABASE_PUBLISHABLE_KEY'];
 
@@ -46,8 +52,6 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Error(message);
     }
     
-    const request = getRequest();
-
     if (!request?.headers) {
       throw new Error('Unauthorized: No request headers available');
     }
@@ -97,12 +101,14 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     if (!data.claims.sub) {
       throw new Error('Unauthorized: No user ID found in token');
     }
+    const expected = request.headers.get("x-lokalchat-account");
+    if (expected && expected !== data.claims.sub) throw new Error("Unauthorized: Akaun telah berubah. Muat semula halaman.");
 
     return next({
       context: {
         supabase,
         userId: data.claims.sub,
-        claims: data.claims,
+        claims: data.claims as Record<string, unknown>,
       },
     });
   },

@@ -66,105 +66,72 @@ export const Route = createFileRoute("/api/public/whatsapp")({
           "@/integrations/supabase/client.server"
         );
 
-        // Every entry in one delivery belongs to the same phone number id.
-        const phoneNumberId: string | undefined =
-        payload?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
+        const changes = (Array.isArray(payload?.entry) ? payload.entry : [])
+          .flatMap((entry: any) => Array.isArray(entry?.changes) ? entry.changes : []);
+        if (!changes.length) return new Response("Bad request", { status: 400 });
 
-        if (!phoneNumberId) {
-          return new Response("Bad request", { status: 400 });
-        }
-
-        const { data: connection } = await supabaseAdmin
-        .from("whatsapp_connections")
-        .select("business_id, app_secret_encrypted")
-        .eq("phone_number_id", phoneNumberId)
-        .maybeSingle();
-
-        const businessId = connection?.business_id;
-
-        if (!businessId || !connection?.app_secret_encrypted) {
-          console.error(
-            "No usable whatsapp_connections row for",
-            phoneNumberId
-          );
-
-          return new Response("Unauthorized", { status: 401 });
-        }
-
-        // --- Signature verification (before any DB write) ---
         const { createHmac, timingSafeEqual } = await import("node:crypto");
         const { decryptSecret } = await import("@/lib/wa-crypto.server");
-
-        let appSecret: string;
-
-        try {
-          appSecret = decryptSecret(connection.app_secret_encrypted);
-        } catch (error) {
-          console.error("Failed to decrypt app secret", error);
-          return new Response("Unauthorized", { status: 401 });
-        }
-
-        const expected =
-        "sha256=" +
-        createHmac("sha256", appSecret)
-        .update(rawBody, "utf8")
-        .digest("hex");
-
-        const provided = signature ?? "";
-        const a = Buffer.from(provided);
-        const b = Buffer.from(expected);
-
-        if (a.length !== b.length || !timingSafeEqual(a, b)) {
-          console.error(
-            "Invalid X-Hub-Signature-256 for",
-            phoneNumberId
-          );
-
-          return new Response("Unauthorized", { status: 401 });
+        const verified = new Map<string, string>();
+        // Verify every account represented in the envelope before any write.
+        for (const change of changes) {
+          const phoneNumberId = change?.value?.metadata?.phone_number_id;
+          if (typeof phoneNumberId !== "string" || !phoneNumberId) {
+            return new Response("Bad request", { status: 400 });
+          }
+          if (verified.has(phoneNumberId)) continue;
+          const { data: connection, error } = await supabaseAdmin
+            .from("whatsapp_connections")
+            .select("business_id, app_secret_encrypted")
+            .eq("phone_number_id", phoneNumberId)
+            .maybeSingle();
+          if (error) return new Response("Connection lookup failed", { status: 500 });
+          if (!connection?.business_id || !connection?.app_secret_encrypted) {
+            return new Response("Unauthorized", { status: 401 });
+          }
+          let appSecret: string;
+          try {
+            appSecret = decryptSecret(connection.app_secret_encrypted);
+          } catch {
+            return new Response("Unauthorized", { status: 401 });
+          }
+          const expected = "sha256=" + createHmac("sha256", appSecret).update(rawBody, "utf8").digest("hex");
+          const provided = Buffer.from(signature ?? "");
+          const expectedBytes = Buffer.from(expected);
+          if (provided.length !== expectedBytes.length || !timingSafeEqual(provided, expectedBytes)) {
+            return new Response("Unauthorized", { status: 401 });
+          }
+          verified.set(phoneNumberId, connection.business_id);
         }
 
         let processingFailed = false;
 
         try {
-          const { ingestCustomerMessage } = await import(
-            "@/lib/agent.server"
-          );
-
-          for (const entry of Array.isArray(payload?.entry) ? payload.entry : []) {
-            for (const change of entry?.changes ?? []) {
-              const value = change?.value;
-
-              if (value?.metadata?.phone_number_id !== phoneNumberId) {
-                continue;
-              }
-
-              const contacts = value?.contacts ?? [];
-
-              for (const message of value?.messages ?? []) {
-                if (message?.type !== "text") continue;
-
-                const from: string | undefined = message.from;
-                const text: string | undefined = message.text?.body;
-
-                // NEW: Get unique WhatsApp message ID
-                const messageId: string | undefined = message.id;
-
-                // NEW: Require message ID for deduplication
-                if (!from || !text || !messageId) continue;
-
-                const name =
-                contacts.find((c: any) => c?.wa_id === from)
-                ?.profile?.name ?? null;
-
-                // NEW: Pass messageId to ingestion function
-                await ingestCustomerMessage({
-                  businessId,
-                  customerPhone: from,
-                  customerName: name,
-                  text,
-                  messageId,
-                });
-              }
+          const { normalizeWhatsAppInbound } = await import("@/lib/whatsapp-inbound");
+          const { processWhatsAppStatuses } = await import("@/lib/delivery-status.server");
+          const { providerEventTime } = await import("@/lib/whatsapp-window.server");
+          for (const change of changes) {
+            const value = change.value;
+            const phoneNumberId = value.metadata.phone_number_id as string;
+            const businessId = verified.get(phoneNumberId)!;
+            await processWhatsAppStatuses({ supabase: supabaseAdmin, userId: businessId, phoneNumberId, statuses: value.statuses });
+            if (value.messages != null && !Array.isArray(value.messages)) throw new Error("Invalid WhatsApp messages collection");
+            for (const rawMessage of Array.isArray(value.messages) ? value.messages : []) {
+              const message = normalizeWhatsAppInbound(rawMessage, value.contacts);
+              const { data, error } = await supabaseAdmin.rpc("persist_whatsapp_inbound", {
+                p_business_id: businessId,
+                p_external_message_id: message.messageId,
+                p_phone: message.phone,
+                p_bsuid: message.bsuid,
+                p_name: message.name,
+                p_type: message.type,
+                p_text: message.text,
+                p_metadata: message.metadata as import("@/integrations/supabase/types").Json,
+                p_needs_handoff: message.needsHandoff,
+                p_phone_number_id: phoneNumberId,
+                p_provider_timestamp: message.opensServiceWindow ? providerEventTime(message.timestamp) : null,
+              });
+              if (error || !data?.[0]?.chat_id) throw new Error("WhatsApp inbound durable persistence failed");
             }
           }
         } catch (error) {
@@ -172,8 +139,7 @@ export const Route = createFileRoute("/api/public/whatsapp")({
           processingFailed = true;
         }
 
-        // Ack successful/deduplicated deliveries. A processing failure returns
-        // 5xx so Meta retries; the inbound claim state makes that retry safe.
+        // Acknowledge durable insertion only. The recovery worker owns AI and delivery.
         return new Response(processingFailed ? "PROCESSING_FAILED" : "EVENT_RECEIVED", {
           status: processingFailed ? 500 : 200,
         });

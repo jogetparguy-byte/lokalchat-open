@@ -23,7 +23,8 @@ SELECT id, business_id, customer_phone, customer_name, is_bot_active,
 SELECT id, chat_id, sender, text, external_message_id, processing_status,
        processing_started_at, processed_at, reply_to_external_message_id,
        client_request_id, delivery_status, delivery_started_at, delivery_attempts,
-       last_delivery_error, sent_at, created_at FROM public.messages LIMIT 0;
+       last_delivery_error, sent_at, created_at, provider_message_id, provider_phone_number_id,
+       provider_delivery_status, provider_status_at, inbound_type, inbound_metadata FROM public.messages LIMIT 0;
 SELECT id, business_id, content, embedding, document_id FROM public.knowledge_base LIMIT 0;
 SELECT id, business_id, file_name, file_type, file_size, storage_path,
        status, status_message, created_at, updated_at FROM public.kb_documents LIMIT 0;
@@ -119,6 +120,23 @@ BEGIN
       VALUES (chat_a, 'bot', 'Duplicate reply', inbound_id);
     RAISE EXCEPTION 'Duplicate linked bot reply accepted';
   EXCEPTION WHEN unique_violation THEN NULL; END;
+  INSERT INTO public.messages (chat_id, sender, text, reply_to_external_message_id, reply_sequence, delivery_status)
+    VALUES (chat_a, 'bot', 'Disposable second part', inbound_id, 1, 'pending'),
+           (chat_a, 'bot', 'Disposable third part', inbound_id, 2, 'pending');
+  SELECT count(*) INTO row_count FROM public.messages
+    WHERE chat_id = chat_a AND reply_to_external_message_id = inbound_id;
+  IF row_count <> 3 THEN RAISE EXCEPTION 'Multipart reply did not persist all parts'; END IF;
+  BEGIN
+    INSERT INTO public.messages (chat_id, sender, text, reply_to_external_message_id, reply_sequence)
+      VALUES (chat_a, 'bot', 'Duplicate second part', inbound_id, 1);
+    RAISE EXCEPTION 'Duplicate reply sequence accepted';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO public.messages (chat_id, sender, text, reply_to_external_message_id, reply_sequence)
+      VALUES (chat_a, 'bot', 'Invalid fourth part', inbound_id, 3);
+    RAISE EXCEPTION 'Fourth reply sequence accepted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS ordered multipart reply constraints';
   INSERT INTO public.messages (chat_id, sender, text, client_request_id, delivery_status)
     VALUES (chat_a, 'human', 'Disposable human reply', request_id, 'failed') RETURNING id INTO human_id;
   BEGIN

@@ -12,8 +12,9 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "start": "node --env-file-if-exists=.env .output/server/index.mjs",
-    "test": "node --import tsx tests/upload-document.test.mjs && node --import tsx tests/inbox.test.tsx && node tests/backend-delivery.test.mjs && node tests/delivery-error.test.mjs && node tests/check-env.test.mjs && node --import tsx --test tests/public-config.test.mjs && node tests/local-setup.test.mjs && npm run test:llm-settings && npm run test:supabase-settings && npm run test:theme && npm run test:settings && npm run test:tenant-env && node --import tsx tests/release-security.test.mjs && npm run test:account",
-    "test:account": "node --import tsx --test tests/account-auth.test.mjs tests/account-auth-attacher.test.mjs tests/onboarding.test.mjs",
+    "test": "node --import tsx tests/upload-document.test.mjs && node --import tsx tests/inbox.test.tsx && node tests/backend-delivery.test.mjs && node tests/delivery-error.test.mjs && node tests/check-env.test.mjs && node --import tsx --test tests/public-config.test.mjs && node tests/local-setup.test.mjs && npm run test:llm-settings && npm run test:supabase-settings && npm run test:theme && npm run test:settings && npm run test:tenant-env && node --import tsx tests/release-security.test.mjs && npm run test:account && npm run test:multi-response && npm run test:agent-policies && npm run test:whatsapp && npm run test:handoff",
+    "test:multi-response": "node --test tests/multi-response.test.mjs tests/inbound-recovery.test.mjs tests/inbound-recovery-sql.test.mjs tests/chat-turns-sql.test.mjs",
+    "test:account": "node --import tsx --test tests/account-auth.test.mjs tests/account-auth-attacher.test.mjs tests/account-request.test.mjs tests/account-browser-auth.test.mjs tests/local-backend.test.mjs tests/onboarding.test.mjs",
     "test:theme": "node --import tsx tests/theme.test.mjs",
     "test:theme:ssr": "node tests/theme-ssr.mjs",
     "test:browser": "node tests/browser.test.mjs",
@@ -32,7 +33,10 @@
     "test:supabase-settings:browser": "node tests/supabase-settings-browser.mjs",
     "test:settings": "node --import tsx tests/settings.test.mjs",
     "test:tenant-env": "node --import tsx tests/tenant-env.test.mjs",
-    "test:supabase-integration": "node --import tsx tests/supabase-integration.test.mjs"
+    "test:supabase-integration": "node --import tsx tests/supabase-integration.test.mjs",
+    "test:agent-policies": "node --test tests/agent-prompt.test.mjs tests/commercial-grounding.test.mjs",
+    "test:whatsapp": "node --import tsx --test tests/whatsapp-delivery.test.mjs tests/whatsapp-delivery-sql.test.mjs tests/whatsapp-inbound.test.mjs tests/whatsapp-inbound-sql.test.mjs tests/whatsapp-window.test.mjs tests/weekly-template.test.mjs tests/whatsapp-window-sql.test.mjs",
+    "test:handoff": "node --test tests/handoff-api.test.mjs tests/handoff-notifications.test.mjs tests/handoff-sql.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

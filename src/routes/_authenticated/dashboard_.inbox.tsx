@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChatSidebar, type ChatRow } from "@/components/dashboard/ChatSidebar";
 import { ChatWindow, type MessageRow } from "@/components/dashboard/ChatWindow";
+import { HandoffPanel } from "@/components/dashboard/HandoffPanel";
 import {
+  getHandoffChat,
   listChats,
   listMessages,
   setBotActive,
@@ -47,7 +49,9 @@ export function DashboardPage() {
 
   const [actionError, setActionError] = useState<{ chatId: string; text: string } | null>(null);
   const retryLock = useRef(false);
+  const chatWindowRef = useRef<HTMLElement>(null);
   const fetchChats = useApi(listChats);
+  const fetchHandoffChat = useApi(getHandoffChat);
   const fetchMessages = useApi(listMessages);
   const toggleBot = useApi(setBotActive);
   const sendReply = useApi(sendHumanReply);
@@ -58,10 +62,21 @@ export function DashboardPage() {
   const refresh = async (chatId?: string) => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["chats"] }),
+      queryClient.invalidateQueries({ queryKey: ["handoff-tasks"] }),
+      queryClient.invalidateQueries({ queryKey: chatId ? ["handoff-chat", chatId] : ["handoff-chat"] }),
       queryClient.invalidateQueries({ queryKey: chatId ? ["messages", chatId] : ["messages"] }),
     ]);
   };
   const chatsQuery = useQuery({ queryKey: ["chats"], queryFn: () => fetchChats(), refetchInterval: 5000, retry: 1 });
+  const chats = chatsQuery.data ?? [];
+  const listedChat = chats.find((chat) => chat.id === selectedId);
+  const handoffChatQuery = useQuery({
+    queryKey: ["handoff-chat", selectedId],
+    queryFn: () => selectedId ? fetchHandoffChat({ data: { chatId: selectedId } }) : null,
+    enabled: Boolean(selectedId && !listedChat && !chatsQuery.isPending),
+    refetchInterval: 5000,
+    retry: 1,
+  });
   const messagesQuery = useQuery({
     queryKey: ["messages", selectedId],
     queryFn: () => selectedId ? fetchMessages({ data: { chatId: selectedId } }) : [],
@@ -97,8 +112,7 @@ export function DashboardPage() {
     retry: false,
   });
 
-  const selectedChat =
-    (chatsQuery.data ?? []).find((chat) => chat.id === selectedId) ?? null;
+  const selectedChat = listedChat ?? handoffChatQuery.data ?? null;
 
   return (
     <ConsoleShell>
@@ -111,15 +125,22 @@ export function DashboardPage() {
 
       {chatsQuery.isPending && <p role="status" className="mb-3 text-sm">{tr("Memuatkan perbualan…")}</p>}
       {chatsQuery.isError && <div role="alert" className="mb-3 text-sm text-destructive">{tr("Perbualan gagal dimuatkan. ")}<Button variant="outline" size="sm" onClick={() => chatsQuery.refetch()}>{tr("Cuba lagi")}</Button></div>}
+      <HandoffPanel chats={chats} onOpenChat={(chatId) => {
+        setSelectedId(chatId);
+        chatWindowRef.current?.focus();
+      }} />
       <div className="flex min-h-[32rem] flex-col md:flex-row flex-1 overflow-hidden rounded-xl border border-border">
         <aside className="max-h-64 w-full border-b border-border md:max-h-none md:max-w-xs md:border-b-0 md:border-r">
           <ChatSidebar
-            chats={(chatsQuery.data ?? []) as ChatRow[]}
+            chats={chats}
             selectedId={selectedId}
             onSelect={setSelectedId}
           />
         </aside>
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main ref={chatWindowRef} tabIndex={-1} className="flex min-w-0 flex-1 flex-col">
+          {selectedId && !selectedChat && handoffChatQuery.isError && (
+            <p role="alert" className="p-4 text-sm">{tr("Perbualan gagal dimuatkan. ")}</p>
+          )}
           <ChatWindow
             chat={selectedChat as ChatRow | null}
             messages={(messagesQuery.data ?? []) as MessageRow[]}

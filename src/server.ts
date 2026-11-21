@@ -1,4 +1,11 @@
 import "./lib/error-capture";
+import { startInboundRecovery } from "./lib/inbound-recovery.server";
+import { startHandoffNotifications } from "./lib/handoff-notifications.server";
+
+if (process.env['SUPABASE_URL'] && process.env['SUPABASE_SERVICE_ROLE_KEY']) {
+  startInboundRecovery();
+  startHandoffNotifications();
+}
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";

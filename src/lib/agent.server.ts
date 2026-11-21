@@ -5,16 +5,42 @@
  * with three tools: search_faq (pgvector RAG), check_stock (live inventory
  * HTTP fetch) and trigger_human_handoff (pauses the bot for this chat).
  */
+import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { accountPreferences, replyInstruction, type ReplyLanguage } from "./preferences";
 import { createEmbedding } from "./embeddings.server";
 import { sendWhatsAppMessage } from "./whatsapp.server";
+import { recordWhatsAppAcceptance } from "./delivery-status.server";
+import { buildAgentSystemPrompt } from "./agent-prompt.server";
+import { enforceCommercialGrounding, readCommercialInventory } from "./commercial-grounding.server";
 
-const HANDOFF_REPLY = "Maaf ya, saya sambungkan kepada pemilik kedai sekarang.";
+const HANDOFF_REPLY = "Permintaan bantuan manusia direkod untuk semakan pemilik. Balasan pemilik tidak serta-merta.";
+class ChatSupersededError extends Error {}
 
 export const SYSTEM_PROMPT = `Anda adalah AI customer service bernama LokalChat untuk kedai PKS Malaysia. Anda wajib faham Bahasa Melayu Pasar, English, dan Manglish (cth: 'ada stock tak?', 'pm harga boss', 'bila pos?'). Jawab dengan mesra (boleh guna sis/boss/bro). Gunakan fungsi 'search_faq' untuk mencari jawapan dan 'check_stock' untuk semak inventori. Jika soalan tiada dalam FAQ, atau pelanggan mahu bercakap dengan manusia, panggil fungsi 'trigger_human_handoff' segera (reason='no_answer' jika anda tidak pasti jawapannya, reason='customer_request' jika pelanggan minta manusia). Jangan reka jawapan yang tiada dalam FAQ.`;
 
 const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "respond_to_customer",
+      description:
+        "Complete the reply with 1–3 ordered messages. Prefer one message for simple answers. Use separate messages only for distinct, useful points (answer, verified relevant promotion, optional next step). Never invent prices, discounts, deadlines or order capabilities. Do not force a promotion or sales question. Finish other lookups first; call this tool alone after obtaining the facts. Do not change the owner's selected model.",
+      parameters: {
+        type: "object",
+        properties: {
+          messages: {
+            type: "array",
+            minItems: 1,
+            maxItems: 3,
+            items: { type: "string", minLength: 1, maxLength: 4096 },
+          },
+        },
+        required: ["messages"],
+        additionalProperties: false,
+      },
+    },
+  },
   {
     type: "function",
     function: {
@@ -113,60 +139,16 @@ async function searchFaq(query: string, businessId: string | null): Promise<stri
 }
 
 async function checkStock(productName: string, businessId: string | null): Promise<string> {
-  if (!businessId) return "Sistem inventori belum disambungkan oleh pemilik kedai.";
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("inventory_api_url")
-    .eq("id", businessId)
-    .maybeSingle();
-
-  const baseUrl = profile?.inventory_api_url;
-  if (!baseUrl) return "Sistem inventori belum disambungkan oleh pemilik kedai.";
-
-
-  try {
-    const { fetchPublicHttp } = await import("./ssrf.server");
-    const url = new URL(baseUrl);
-    url.searchParams.set("product", productName);
-    const res = await fetchPublicHttp(url.toString(), {
-      headers: { Accept: "application/json" },
-      maxBytes: 64 * 1024,
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return `Gagal semak stok (status ${res.status}).`;
-
-    // Read response body with hard limit (64 KiB) without trusting Content-Length
-    const MAX_BODY = 64 * 1024;
-    let body = "";
-    if (res.body) {
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let total = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        total += value.length;
-        if (total > MAX_BODY) return "Respons inventori terlalu besar.";
-        body += decoder.decode(value, { stream: true });
-      }
-      body += decoder.decode();
-    } else {
-      body = await res.text();
-      if (body.length > MAX_BODY) return "Respons inventori terlalu besar.";
-    }
-    return body.slice(0, 1500);
-  } catch (error) {
-    console.error("check_stock failed", { message: error instanceof Error ? error.message : String(error) });
-    return "Sistem inventori tidak dapat dihubungi buat masa ini.";
-  }
+  const stock = await readCommercialInventory(productName, businessId);
+  return stock ? JSON.stringify(stock) : "Stok belum dapat disahkan. Sambungkan pelanggan kepada pemilik kedai.";
 }
 
-async function triggerHumanHandoff(chatId: string): Promise<string> {
-  const { error } = await supabaseAdmin
-    .from("chats")
-    .update({ is_bot_active: false })
-    .eq("id", chatId);
+async function triggerHumanHandoff(chatId: string, generation: number, turnToken?: string): Promise<number> {
+  const { data, error } = await supabaseAdmin.rpc("handoff_chat", {
+    p_chat_id: chatId, p_generation: generation, p_token: turnToken ?? null,
+  });
   if (error) throw new Error(`handoff update failed: ${error.message}`);
+  if (data === null) throw new ChatSupersededError("Chat changed during AI processing");
 
   await supabaseAdmin.from("messages").insert({
     chat_id: chatId,
@@ -174,26 +156,20 @@ async function triggerHumanHandoff(chatId: string): Promise<string> {
     text: "⚠️ Bot dimatikan — perbualan diserahkan kepada pemilik kedai.",
   });
 
-  return HANDOFF_REPLY;
+  return data;
 }
 
 /* ------------------------------- runner --------------------------------- */
 
-async function loadHistory(chatId: string): Promise<ChatMessage[]> {
-  const { data } = await supabaseAdmin
-    .from("messages")
-    .select("sender, text")
-    .eq("chat_id", chatId)
-    .order("created_at", { ascending: false })
-    .limit(16);
-
-  return (data ?? [])
-    .reverse()
-    .filter((m) => m.sender !== "system")
-    .map((m) => ({
-      role: m.sender === "customer" ? ("user" as const) : ("assistant" as const),
-      content: m.text,
-    }));
+async function loadHistory(chatId: string, messageId?: string): Promise<ChatMessage[]> {
+  const { data, error } = await supabaseAdmin.rpc("load_chat_turn_history", {
+    p_chat_id: chatId, p_external_message_id: messageId ?? null,
+  });
+  if (error) throw new Error(`Unable to read chat history: ${error.message}`);
+  return (data ?? []).map((m) => ({
+    role: m.sender === "customer" ? ("user" as const) : ("assistant" as const),
+    content: m.text,
+  }));
 }
 
 async function callGateway(messages: ChatMessage[], businessId: string | null) {
@@ -235,10 +211,34 @@ async function callGateway(messages: ChatMessage[], businessId: string | null) {
 
 export type AgentResult = {
   reply: string;
+  replies: LinkedReply[];
   handedOff: boolean;
   /** Persisted bot message id; delivery is handled by the caller. */
   botMessageId: string;
 };
+
+export function parseResponseMessages(argumentsJson: string): string[] {
+  const value: unknown = JSON.parse(argumentsJson);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Expected a messages object");
+  }
+  const record = value as Record<string, unknown>;
+  const rawMessages = record["messages"];
+  if (Object.keys(record).length !== 1 || !Array.isArray(rawMessages)
+    || rawMessages.length < 1 || rawMessages.length > 3) {
+    throw new Error("Expected 1–3 messages");
+  }
+  const messages = rawMessages.map((text: unknown) => {
+    if (typeof text !== "string" || !text.trim() || text.length > 4096) {
+      throw new Error("Each message must contain 1–4096 characters");
+    }
+    return text.trim();
+  });
+  if (new Set(messages).size !== messages.length) {
+    throw new Error("Messages must not repeat");
+  }
+  return messages;
+}
 
 /**
  * Runs the agent for the latest customer message on a chat, persists the bot
@@ -250,15 +250,20 @@ export async function runAgent(params: {
   userMessage: string;
   /** WhatsApp message.id, used to link the bot reply for crash-safe dedup. */
   messageId?: string;
+  turnToken?: string;
 }): Promise<AgentResult> {
-  const { chatId, customerPhone, userMessage, messageId } = params;
+  const { chatId, customerPhone, userMessage, messageId, turnToken } = params;
 
-  const { data: chatRow } = await supabaseAdmin
+  const { data: chatRow, error: chatError } = await supabaseAdmin
     .from("chats")
-    .select("business_id")
+    .select("business_id, is_bot_active, bot_generation")
     .eq("id", chatId)
     .maybeSingle();
   const businessId = chatRow?.business_id ?? null;
+  if (chatError || !chatRow) throw new Error("Unable to read chat state");
+  const cancelledResult = (): AgentResult => ({ reply: "", replies: [], handedOff: false, botMessageId: "" });
+  if (!chatRow.is_bot_active) return cancelledResult();
+  let generation = chatRow.bot_generation;
 
   let replyLanguage: ReplyLanguage = "auto";
   if (businessId) {
@@ -266,11 +271,11 @@ export async function runAgent(params: {
     if (!error && data.user) replyLanguage = accountPreferences(data.user.user_metadata).replyLanguage;
   }
   const languageInstruction = replyInstruction(replyLanguage);
-  const handoffReply = replyLanguage === "en" ? "I’m connecting you to the store owner now." : HANDOFF_REPLY;
-  const history = await loadHistory(chatId);
+  const handoffReply = replyLanguage === "en" ? "Your request for human help is recorded for owner review. An immediate owner reply is not guaranteed." : HANDOFF_REPLY;
+  const history = await loadHistory(chatId, messageId);
 
   const messages: ChatMessage[] = [
-    { role: "system", content: `${SYSTEM_PROMPT}\n${languageInstruction}` },
+    { role: "system", content: "" },
     ...history,
   ];
   if (history.at(-1)?.content !== userMessage) {
@@ -279,8 +284,10 @@ export async function runAgent(params: {
 
   let handedOff = false;
   let reply = "";
+  let responseMessages: string[] | undefined;
 
   try {
+    messages[0]!.content = await buildAgentSystemPrompt({ businessId, platformPrompt: SYSTEM_PROMPT, languageInstruction });
     for (let step = 0; step < 4; step += 1) {
       const completion = await callGateway(messages, businessId);
       const choice = completion.choices?.[0]?.message;
@@ -292,6 +299,24 @@ export async function runAgent(params: {
       if (toolCalls.length === 0) {
         reply = (choice.content ?? "").trim();
         break;
+      }
+
+      const responseCall = toolCalls.find((call) => call.function.name === "respond_to_customer");
+      if (responseCall) {
+        if (toolCalls.length !== 1) {
+          for (const call of toolCalls) {
+            messages.push({ role: "tool", tool_call_id: call.id, content: "No tools executed. Complete lookups first; call respond_to_customer alone afterwards." });
+          }
+          continue;
+        }
+        try {
+          responseMessages = parseResponseMessages(responseCall.function.arguments);
+          reply = responseMessages.join("\n\n");
+          break;
+        } catch {
+          messages.push({ role: "tool", tool_call_id: responseCall.id, content: "Invalid response. Supply 1–3 distinct non-empty strings, at most 4096 characters each, in the messages array." });
+          continue;
+        }
       }
 
       for (const call of toolCalls) {
@@ -312,7 +337,8 @@ export async function runAgent(params: {
 
             break;
           case "trigger_human_handoff":
-            result = await triggerHumanHandoff(chatId);
+            generation = await triggerHumanHandoff(chatId, generation, turnToken);
+            result = handoffReply;
             handedOff = true;
             if (args["reason"] !== "customer_request" && businessId) {
               const { recordUnansweredQuestion } = await import("./unanswered.server");
@@ -331,31 +357,80 @@ export async function runAgent(params: {
         break;
       }
     }
+    if (!handedOff && reply) {
+      const grounded = await enforceCommercialGrounding({
+        businessId, userMessage, replies: responseMessages ?? [reply], replyLanguage,
+        history: history.map(message => message.content ?? ""),
+      });
+      if (grounded.required) {
+        if (grounded.replies) {
+          responseMessages = grounded.replies;
+          reply = responseMessages.join("\n\n");
+        } else {
+          generation = await triggerHumanHandoff(chatId, generation, turnToken);
+          handedOff = true;
+          responseMessages = undefined;
+          reply = handoffReply;
+          if (businessId) {
+            const { recordUnansweredQuestion } = await import("./unanswered.server");
+            await recordUnansweredQuestion({ businessId, chatId, question: userMessage });
+          }
+        }
+      }
+    }
   } catch (error) {
+    if (error instanceof ChatSupersededError) return cancelledResult();
     console.error("Agent run failed", { message: error instanceof Error ? error.message : String(error) });
     reply = replyLanguage === "en"
       ? "The assistant is temporarily unavailable. I’m contacting the store owner for you."
       : "Maaf boss, sistem saya ada gangguan sekejap. Saya panggil pemilik kedai ya.";
     if (!handedOff) {
-      await triggerHumanHandoff(chatId);
+      try { generation = await triggerHumanHandoff(chatId, generation, turnToken); }
+      catch (handoffError) {
+        if (handoffError instanceof ChatSupersededError) return cancelledResult();
+        throw handoffError;
+      }
       handedOff = true;
     }
   }
 
-  if (!reply) reply = handoffReply;
+  if (!reply) {
+    if (!handedOff) {
+      try { generation = await triggerHumanHandoff(chatId, generation, turnToken); }
+      catch (error) {
+        if (error instanceof ChatSupersededError) return cancelledResult();
+        throw error;
+      }
+    }
+    handedOff = true;
+    reply = handoffReply;
+  }
 
-  const { data: botMessage, error: botInsertError } = await supabaseAdmin
+  // One insert persists the complete batch atomically before any WhatsApp send.
+  const { data: currentChat, error: currentError } = await supabaseAdmin.from("chats")
+    .select("is_bot_active, bot_generation").eq("id", chatId).single();
+  if (currentError || !currentChat) throw new Error("Unable to verify chat state");
+  if (currentChat.bot_generation !== generation || (!handedOff && !currentChat.is_bot_active)) {
+    return cancelledResult();
+  }
+  const parts = handedOff ? [reply] : responseMessages ?? [reply];
+  const createdAt = new Date().toISOString();
+
+  const { data: botMessages, error: botInsertError } = await supabaseAdmin
     .from("messages")
-    .insert({
+    .insert(parts.map((text, replySequence) => ({
       chat_id: chatId,
-      sender: "bot",
-      text: reply,
+      sender: "bot" as const,
+      text,
+      created_at: createdAt,
+      reply_sequence: replySequence,
       delivery_status: "pending",
+      bot_generation: generation,
+      bot_reply_kind: handedOff ? "handoff" : "answer",
       ...(messageId ? { reply_to_external_message_id: messageId } : {}),
-    })
-    .select("id")
-    .single();
-  if (botInsertError || !botMessage) {
+    })))
+    .select("id, text, reply_sequence, delivery_status");
+  if (botInsertError || !botMessages || botMessages.length !== parts.length) {
     // Do not send a reply that was not persisted: the caller marks the inbound
     // message as failed so a later webhook retry can regenerate it.
     throw new Error(
@@ -364,10 +439,13 @@ export async function runAgent(params: {
   }
   await supabaseAdmin
     .from("chats")
-    .update({ last_message: reply, updated_at: new Date().toISOString() })
-    .eq("id", chatId);
+    .update({ last_message: parts.at(-1)!, updated_at: new Date().toISOString() })
+    .eq("id", chatId).eq("bot_generation", generation);
 
-  return { reply, handedOff, botMessageId: botMessage.id };
+  const replies = botMessages.sort((a, b) => a.reply_sequence - b.reply_sequence).map((row) => ({
+    id: row.id, text: row.text, deliveryStatus: row.delivery_status,
+  }));
+  return { reply, replies, handedOff, botMessageId: replies[0]!.id };
 }
 
 /**
@@ -375,26 +453,28 @@ export async function runAgent(params: {
  * simulator: upsert chat, log the customer message, then run the bot when it
  * is active for that chat.
  */
-async function claimInboundMessage(chatId: string, messageId: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin.rpc("claim_inbound_message", {
+async function claimInboundMessage(chatId: string, messageId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin.rpc("claim_chat_turn", {
     p_chat_id: chatId,
     p_external_message_id: messageId,
   });
   if (error) throw new Error(`Failed to claim inbound message: ${error.message}`);
-  return data === true;
+  return data;
 }
 
 async function finishInboundMessage(
   chatId: string,
   messageId: string,
+  turnToken: string,
   status: "done" | "failed",
 ): Promise<void> {
-  const { error } = await supabaseAdmin.rpc("finish_inbound_message", {
+  const { error } = await supabaseAdmin.rpc("finish_chat_turn", {
     p_chat_id: chatId,
     p_external_message_id: messageId,
     p_status: status,
+    p_token: turnToken,
   });
-  if (error) console.error("Failed to finalize inbound message", error);
+  if (error) throw new Error(`Failed to finalize inbound message: ${error.message}`);
 }
 
 type LinkedReply = {
@@ -403,33 +483,24 @@ type LinkedReply = {
   deliveryStatus: string | null;
 };
 
-/** Finds the single bot reply linked to an inbound message, if it exists. */
-async function findLinkedReply(
+/** Loads the persisted batch in send order, including parts already sent. */
+async function findLinkedReplies(
   chatId: string,
   messageId: string,
-): Promise<LinkedReply | null> {
+): Promise<LinkedReply[]> {
   const { data, error } = await supabaseAdmin
     .from("messages")
     .select("id, text, delivery_status")
     .eq("chat_id", chatId)
+    .eq("sender", "bot")
     .eq("reply_to_external_message_id", messageId)
-    .maybeSingle();
+    .order("reply_sequence", { ascending: true });
   if (error) throw new Error(error.message);
-  if (!data) return null;
-  return {
-    id: data.id,
-    text: data.text,
-    deliveryStatus: data.delivery_status,
-  };
+  return (data ?? []).map((row) => ({
+    id: row.id, text: row.text, deliveryStatus: row.delivery_status,
+  }));
 }
 
-async function claimOutboundMessage(messageId: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin.rpc("claim_outbound_message", {
-    p_message_id: messageId,
-  });
-  if (error) throw new Error(`Failed to claim outbound message: ${error.message}`);
-  return data === true;
-}
 
 async function finishOutboundMessage(
   messageId: string,
@@ -441,7 +512,7 @@ async function finishOutboundMessage(
     p_status: status,
     p_error: errorMessage ?? null,
   });
-  if (error) console.error("Failed to finalize outbound message", error);
+  if (error) throw new Error(`Failed to finalize outbound message: ${error.message}`);
 }
 
 /** Submits an already-persisted bot reply, retrying safely on later requests. */
@@ -450,9 +521,17 @@ async function deliverBotReply(
   customerPhone: string,
   businessId: string,
   allowDryRun: boolean,
-): Promise<"sent" | "in_progress" | "failed"> {
-  const claimed = await claimOutboundMessage(reply.id);
-  if (!claimed) return "in_progress";
+  turnToken: string,
+): Promise<"sent" | "in_progress" | "failed" | "blocked"> {
+  if (reply.deliveryStatus === "sent") return "sent";
+  const { data: claim, error: claimError } = await supabaseAdmin.rpc("claim_bot_reply", {
+    p_message_id: reply.id,
+    p_token: turnToken,
+  });
+  if (claimError) throw new Error(`Failed to claim bot reply: ${claimError.message}`);
+  // Cancelled replies are consumed without external delivery, allowing the queue to advance.
+  if (claim === "cancelled" || claim === "sent") return "sent";
+  if (claim !== "claimed") return "in_progress";
 
   let result: Awaited<ReturnType<typeof sendWhatsAppMessage>>;
   try {
@@ -464,12 +543,28 @@ async function deliverBotReply(
   }
 
   if (result.ok) {
-    await finishOutboundMessage(reply.id, "sent");
+    const tracked = await recordWhatsAppAcceptance(supabaseAdmin, businessId, reply.id, result);
+    if (!tracked) await finishOutboundMessage(reply.id, "sent", result.error);
     return "sent";
   }
 
   await finishOutboundMessage(reply.id, "failed", result.error);
-  return "failed";
+  return result.retryable === false ? "blocked" : "failed";
+}
+
+async function deliverBotReplies(
+  replies: LinkedReply[],
+  customerPhone: string,
+  businessId: string,
+  allowDryRun: boolean,
+  turnToken: string,
+): Promise<"sent" | "in_progress" | "failed" | "blocked"> {
+  for (const reply of replies) {
+    const status = await deliverBotReply(reply, customerPhone, businessId, allowDryRun, turnToken);
+    // A failed or leased part blocks all later parts to preserve send order.
+    if (status !== "sent") return status;
+  }
+  return "sent";
 }
 
 export async function ingestCustomerMessage(params: {
@@ -481,13 +576,21 @@ export async function ingestCustomerMessage(params: {
   messageId?: string;
   /** Only the dashboard simulator may complete without real WhatsApp credentials. */
   allowDryRun?: boolean;
+  /** Webhooks acknowledge only after durable insertion; recovery runs the agent. */
+  enqueueOnly?: boolean;
+  /** Recovery uses the original chat without rewriting its latest-message preview. */
+  resumeChatId?: string;
 }): Promise<{ chatId: string; botReply: string | null }> {
-  const { businessId, customerPhone, customerName, text, messageId, allowDryRun } = params;
+  const { businessId, customerPhone, customerName, text, messageId = randomUUID(), allowDryRun } = params;
+  if (params.enqueueOnly && !messageId) throw new Error("Queued messages require messageId");
   if (messageId !== undefined && !messageId.trim()) {
     throw new Error("messageId cannot be empty");
   }
 
-  const { data: chat, error } = await supabaseAdmin
+  const { data: chat, error } = params.resumeChatId
+    ? await supabaseAdmin.from("chats").select("id, is_bot_active, bot_generation")
+        .eq("id", params.resumeChatId).eq("business_id", businessId).single()
+    : await supabaseAdmin
     .from("chats")
     .upsert(
       {
@@ -499,7 +602,7 @@ export async function ingestCustomerMessage(params: {
       },
       { onConflict: "business_id,customer_phone" },
     )
-    .select("id, is_bot_active")
+    .select("id, is_bot_active, bot_generation")
     .single();
 
   if (error || !chat) throw new Error(error?.message ?? "Failed to upsert chat");
@@ -511,11 +614,23 @@ export async function ingestCustomerMessage(params: {
     chat_id: chat.id,
     sender: "customer" as const,
     text,
+    allow_dry_run: Boolean(allowDryRun),
+    bot_generation: chat.bot_generation,
     ...(messageId ? { external_message_id: messageId, processing_status: "pending" } : {}),
   };
-  const { error: insertError } = await supabaseAdmin.from("messages").insert(incomingMessage);
+  const { error: insertError } = params.resumeChatId
+    ? { error: { code: "23505", message: "Resume persisted message" } }
+    : await supabaseAdmin.from("messages").insert(incomingMessage);
 
-  let shouldProcess = true;
+  if (params.enqueueOnly) {
+    if (!messageId) throw new Error("Queued messages require messageId");
+    if (insertError && insertError.code !== "23505") {
+      throw new Error(`Failed to queue customer message: ${insertError.message}`);
+    }
+    return { chatId: chat.id, botReply: null };
+  }
+
+  let shouldProcess: string | null = null;
 
   if (insertError) {
     if (insertError.code === "23505" && messageId) {
@@ -532,24 +647,20 @@ export async function ingestCustomerMessage(params: {
   try {
     // A previous attempt may have persisted the reply. Reuse it and retry only
     // the outbound submission instead of generating a second AI reply.
-    const linkedReply = messageId
-      ? await findLinkedReply(chat.id, messageId)
-      : null;
+    const linkedReplies = messageId
+      ? await findLinkedReplies(chat.id, messageId)
+      : [];
 
-    if (linkedReply) {
-      if (linkedReply.deliveryStatus === "sent") {
-        if (messageId) await finishInboundMessage(chat.id, messageId, "done");
-        return { chatId: chat.id, botReply: null };
-      }
-
-      const existingDelivery = await deliverBotReply(
-        linkedReply,
+    if (linkedReplies.length) {
+      const existingDelivery = await deliverBotReplies(
+        linkedReplies,
         customerPhone,
         businessId,
         Boolean(allowDryRun),
+        shouldProcess,
       );
-      if (existingDelivery === "sent") {
-        if (messageId) await finishInboundMessage(chat.id, messageId, "done");
+      if (existingDelivery === "sent" || existingDelivery === "blocked") {
+        if (messageId) await finishInboundMessage(chat.id, messageId, shouldProcess, "done");
         return { chatId: chat.id, botReply: null };
       }
       if (existingDelivery === "in_progress") {
@@ -559,7 +670,7 @@ export async function ingestCustomerMessage(params: {
     }
 
     if (!chat.is_bot_active) {
-      if (messageId) await finishInboundMessage(chat.id, messageId, "done");
+      if (messageId) await finishInboundMessage(chat.id, messageId, shouldProcess, "done");
       return { chatId: chat.id, botReply: null };
     }
 
@@ -567,31 +678,33 @@ export async function ingestCustomerMessage(params: {
       chatId: chat.id,
       customerPhone,
       userMessage: text,
+      turnToken: shouldProcess,
       ...(messageId ? { messageId } : {}),
     });
 
-    const delivery = await deliverBotReply(
-      {
-        id: result.botMessageId,
-        text: result.reply,
-        deliveryStatus: "pending",
-      },
+    const delivery = await deliverBotReplies(
+      result.replies,
       customerPhone,
       businessId,
       Boolean(allowDryRun),
+      shouldProcess,
     );
 
     if (delivery === "in_progress") {
       return { chatId: chat.id, botReply: result.reply };
     }
+    if (delivery === "blocked") {
+      if (messageId) await finishInboundMessage(chat.id, messageId, shouldProcess, "done");
+      return { chatId: chat.id, botReply: null };
+    }
     if (delivery !== "sent") {
       throw new Error("WhatsApp delivery failed");
     }
 
-    if (messageId) await finishInboundMessage(chat.id, messageId, "done");
+    if (messageId) await finishInboundMessage(chat.id, messageId, shouldProcess, "done");
     return { chatId: chat.id, botReply: result.reply };
   } catch (error) {
-    if (messageId) await finishInboundMessage(chat.id, messageId, "failed");
+    if (messageId) await finishInboundMessage(chat.id, messageId, shouldProcess, "failed");
     throw error;
   }
 }

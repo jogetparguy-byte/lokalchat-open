@@ -3,10 +3,52 @@
  * All of them require an authenticated owner session.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAccountAuth } from "./account-middleware";
 import { summarize, type MsgRow, type HandoffRow } from "./metrics";
 import { safeDeliveryError, DELIVERY_ERRORS } from "./delivery-error";
+
+export const getAccountDataStatus = createServerFn({ method: "GET" })
+  .middleware([requireAccountAuth])
+  .handler(async ({ context }) => {
+    if (!context.account) return { ready: true, message: "" };
+    try {
+      const { localBackendContext } = await import("./account-backend.server");
+      await localBackendContext(getRequest());
+      return { ready: true, message: "" };
+    } catch {
+      return { ready: false, message: "Sambungan data belum tersedia. Semak konfigurasi backend Supabase pemasangan ini." };
+    }
+  });
+
+/** Upload and metadata use the same verified owner and RLS session; no browser Storage credentials are needed. */
+export const uploadKbDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((form: FormData) => {
+    if (!(form instanceof FormData)) throw new Error("Fail diperlukan");
+    if ([...form.keys()].some(key => key !== "file")) throw new Error("Medan muat naik tidak sah");
+    const files = form.getAll("file");
+    if (files.length !== 1 || !(files[0] instanceof File)) throw new Error("Satu fail diperlukan");
+    return files[0];
+  })
+  .handler(async ({ data: file, context }) => {
+    const { uploadDocument } = await import("./upload-document");
+    const { randomUUID } = await import("node:crypto");
+    const id = await uploadDocument({
+      file, userId: context.userId, nonce: randomUUID(),
+      storage: context.supabase.storage.from("kb-documents"),
+      record: async ({ data }) => {
+        const { data: row, error } = await context.supabase.from("kb_documents").insert({
+          business_id: context.userId, file_name: data.fileName, file_type: data.fileType.toUpperCase(),
+          file_size: data.fileSize, storage_path: data.storagePath, status: "pending",
+        }).select("id").single();
+        if (error || !row) throw new Error("Gagal merekod dokumen");
+        return { id: row.id };
+      },
+    });
+    return { ok: true, id };
+  });
 
 async function claimOutboundMessage(messageId: string): Promise<boolean> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -50,10 +92,11 @@ export const listMessages = createServerFn({ method: "POST" })
     const { data: rows, error } = await context.supabase
       .from("messages")
       .select(
-        "id, chat_id, sender, text, created_at, delivery_status, last_delivery_error, sent_at, delivery_attempts",
+        "id, chat_id, sender, text, created_at, delivery_status, last_delivery_error, sent_at, delivery_attempts, provider_delivery_status, provider_status_at",
       )
       .eq("chat_id", data.chatId)
       .order("created_at", { ascending: false })
+      .order("reply_sequence", { ascending: false })
       .order("id", { ascending: false })
       .limit(300);
     if (error) throw new Error(DELIVERY_ERRORS.uncertain);
@@ -194,7 +237,11 @@ export const sendHumanReply = createServerFn({ method: "POST" })
       };
     }
 
-    await finishOutboundMessage(humanMessage.id, "sent");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { recordWhatsAppAcceptance } = await import("./delivery-status.server");
+    if (!await recordWhatsAppAcceptance(supabaseAdmin, context.userId, humanMessage.id, result)) {
+      await finishOutboundMessage(humanMessage.id, "sent", result.error);
+    }
     return { ok: true, messageId: humanMessage.id, deliveryStatus: "sent" };
   });
 
@@ -266,7 +313,11 @@ export const retryFailedHumanReply = createServerFn({ method: "POST" })
       throw new Error(safeDeliveryError(result.error) ?? DELIVERY_ERRORS.failed);
     }
 
-    await finishOutboundMessage(message.id, "sent");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { recordWhatsAppAcceptance } = await import("./delivery-status.server");
+    if (!await recordWhatsAppAcceptance(supabaseAdmin, context.userId, message.id, result)) {
+      await finishOutboundMessage(message.id, "sent", result.error);
+    }
     return { ok: true, messageId: message.id, deliveryStatus: "sent" };
   });
 
@@ -348,6 +399,11 @@ export const updateProfile = createServerFn({ method: "POST" })
     }
     if (context.account) {
       (await import("./account-store.server")).accountProfile(context.userId, patch);
+      const { hasAccountBackendConfig, localBackendContext } = await import("./account-backend.server");
+      if (hasAccountBackendConfig()) {
+        try { await localBackendContext(getRequest()); }
+        catch { throw new Error("Tetapan disimpan secara lokal, tetapi sambungan backend gagal. Cuba simpan semula."); }
+      }
       return { ok: true };
     }
     // Only change the submitted section. Saving one panel must not overwrite another.
